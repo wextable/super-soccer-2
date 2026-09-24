@@ -23,9 +23,14 @@ struct Club: Equatable, Sendable, Identifiable {
         starters.first { $0.position == .keeper } ?? starters[0]
     }
 
+    /// Summary of the attack and defense the match uses. Not the average of the eleven player overalls.
     var overall: Int {
-        guard !starters.isEmpty else { return 0 }
-        return starters.reduce(0) { $0 + $1.overall } / starters.count
+        Self.overall(attack: attack, defense: defense)
+    }
+
+    static func overall(attack: Int, defense: Int) -> Int {
+        let mean = (Double(attack + defense) / 2).rounded()
+        return min(99, max(1, Int(mean)))
     }
 
     var attack: Int {

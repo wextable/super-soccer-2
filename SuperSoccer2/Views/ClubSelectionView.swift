@@ -99,9 +99,12 @@ struct ClubSelectionView: View {
                 Text("Overall \(club.overall)")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundStyle(Theme.ink)
-                Text(club.summaryLine)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Theme.inkMuted)
+                Text("Attack \(club.attack)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(Theme.ink)
+                Text("Defense \(club.defense)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(Theme.ink)
             }
             .padding(Theme.Space.md)
             .frame(maxWidth: .infinity, minHeight: Theme.control, alignment: .leading)
@@ -115,7 +118,7 @@ struct ClubSelectionView: View {
             .shadow(color: Theme.shadow, radius: 2, y: 1)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(club.name), \(club.nickname), overall \(club.overall), \(role(of: club))")
+        .accessibilityLabel("\(club.name), \(club.nickname), overall \(club.overall), attack \(club.attack), defense \(club.defense), \(role(of: club))")
         .accessibilityHint("Takes the job and opens the squad")
     }
 
