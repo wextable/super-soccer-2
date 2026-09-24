@@ -16,14 +16,14 @@ struct SeededGenerator: RandomNumberGenerator, Sendable {
         return mixed ^ (mixed >> 31)
     }
 
-    /// Zero-centered bell curve, standard deviation 1, support clamped to three goals either side of zero.
-    mutating func nextGoalNoise() -> Double {
+    /// Zero-centered bell curve, standard deviation 1, support clamped to `halfWidth` goals either side of zero.
+    mutating func nextGoalNoise(halfWidth: Double = 3) -> Double {
         for _ in 0..<32 {
             let u1 = nextUnitInterval()
             let u2 = nextUnitInterval()
             let magnitude = (-2 * Foundation.log(u1)).squareRoot()
             let draw = magnitude * Foundation.cos(2 * Double.pi * u2)
-            if draw >= -3, draw <= 3 {
+            if draw >= -halfWidth, draw <= halfWidth {
                 return draw
             }
         }

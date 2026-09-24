@@ -2,17 +2,22 @@ import Foundation
 
 /// Seeded port of the previous match. Same clubs and seed, same score, shots, and line.
 enum MatchSimulator {
-    static func simulate(home: Club, away: Club, seed: UInt64) -> MatchResult {
+    static func simulate(
+        home: Club,
+        away: Club,
+        seed: UInt64,
+        tuning: MatchTuning = .current
+    ) -> MatchResult {
         var rng = SeededGenerator(seed: seed)
         let homeAttack = home.attack
         let awayAttack = away.attack
         let homeDefense = home.defense
         let awayDefense = away.defense
 
-        let homeMean = Double(homeAttack - awayDefense) / 7.5 + 1 + 0.25
-        let awayMean = Double(awayAttack - homeDefense) / 7.5 + 1
-        let homeGoals = rolledGoals(mean: homeMean, using: &rng)
-        let awayGoals = rolledGoals(mean: awayMean, using: &rng)
+        let homeMean = tuning.mean(attack: homeAttack, defense: awayDefense, home: true)
+        let awayMean = tuning.mean(attack: awayAttack, defense: homeDefense, home: false)
+        let homeGoals = rolledGoals(mean: homeMean, tuning: tuning, using: &rng)
+        let awayGoals = rolledGoals(mean: awayMean, tuning: tuning, using: &rng)
 
         var shots: [Shot] = []
         shots += scoringShots(
@@ -131,9 +136,10 @@ enum MatchSimulator {
 
     private static func rolledGoals(
         mean: Double,
+        tuning: MatchTuning,
         using rng: inout SeededGenerator
     ) -> Int {
-        let draw = rng.nextGoalNoise()
+        let draw = rng.nextGoalNoise(halfWidth: tuning.goalNoiseHalfWidth)
         return max(0, Int((mean + draw).rounded()))
     }
 

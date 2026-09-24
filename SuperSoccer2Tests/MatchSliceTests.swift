@@ -55,18 +55,29 @@ struct NameAndSquadTests {
         #expect(first[0].starters.filter { $0.position == .keeper }.count == 1)
     }
 
+    @Test func aNewSeedRollsANewSquad() {
+        let first = SquadCatalog.makePair(seed: 1)
+        let second = SquadCatalog.makePair(seed: 2)
+        #expect(first != second)
+        #expect(first[0].overall != 69 || first[1].overall != 62)
+    }
+
     @Test func cityIsTheClearFavoriteAndNorwichCanStillScore() {
-        let clubs = SquadCatalog.makePair(seed: 1)
+        let clubs = SquadCatalog.makePair(seed: 42)
         let city = clubs[0]
         let norwich = clubs[1]
         #expect(city.attack > norwich.attack)
         #expect(city.defense > norwich.defense)
         #expect(city.overall > norwich.overall)
-        let homeMean = Double(city.attack - norwich.defense) / 7.5 + 1.25
-        let awayMean = Double(norwich.attack - city.defense) / 7.5 + 1
-        #expect(homeMean > awayMean + 2)
-        #expect(Int((homeMean - 3).rounded()) <= 0)
-        #expect(Int((awayMean + 3).rounded()) >= 1)
+        let tuning = MatchTuning.current
+        let homeMean = tuning.mean(attack: city.attack, defense: norwich.defense, home: true)
+        let awayMean = tuning.mean(attack: norwich.attack, defense: city.defense, home: false)
+        #expect(homeMean > awayMean)
+        var norwichGoals = 0
+        for seed in UInt64(1)...400 {
+            norwichGoals += MatchSimulator.simulate(home: city, away: norwich, seed: seed).awayScore
+        }
+        #expect(norwichGoals > 0)
     }
 }
 
@@ -267,15 +278,15 @@ struct AppFeatureTests {
 }
 
 private let pinnedSeedSummary = """
-3-0
-Cyprus Quincy
-Finnigan Rudolph
-Smith Ferdinand
+5-0
+Dick Ruben
+Elijah Gary
+Lopez Vargas
 goal
 regular
 4
-Cyprus Quincy of Manchester City scores from Finnigan Rudolph.
-names Miguel Bushido | Chesterfield Wildman
+Dick Ruben of Manchester City scores from Elijah Gary.
+names Darrius Christopher | Chestnutt Gus
 """
 
 private func makePlayer(

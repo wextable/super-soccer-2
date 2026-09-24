@@ -90,6 +90,8 @@ struct Player: Equatable, Sendable, Identifiable {
     var lastName: String
     var position: Position
     var condition: Int
+    /// Set during the tier draft. The match reads starters only.
+    var isStarter: Bool = false
     var ratings: Ratings
 
     var fullName: String {
