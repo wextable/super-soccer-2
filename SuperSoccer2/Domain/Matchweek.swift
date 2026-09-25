@@ -16,6 +16,7 @@ enum Matchweek {
 
     struct Played: Equatable, Sendable {
         var scorelines: [Scoreline]
+        var tallies: [LeagueLeaders.Tally]
         var userMatch: MatchResult
         var home: Club
         var away: Club
@@ -34,6 +35,7 @@ enum Matchweek {
     ) -> Played? {
         let clubsByID = Dictionary(uniqueKeysWithValues: clubs.map { ($0.id, $0) })
         var scorelines: [Scoreline] = []
+        var tallies: [LeagueLeaders.Tally] = []
         var userMatch: MatchResult?
         var homeClub: Club?
         var awayClub: Club?
@@ -48,6 +50,7 @@ enum Matchweek {
                     awayScore: result.awayScore
                 )
             )
+            tallies.append(contentsOf: LeagueLeaders.tally(home: home, away: away, result: result))
             if fixture.homeID == userClubID || fixture.awayID == userClubID {
                 userMatch = result
                 homeClub = home
@@ -55,6 +58,12 @@ enum Matchweek {
             }
         }
         guard let userMatch, let homeClub, let awayClub else { return nil }
-        return Played(scorelines: scorelines, userMatch: userMatch, home: homeClub, away: awayClub)
+        return Played(
+            scorelines: scorelines,
+            tallies: tallies,
+            userMatch: userMatch,
+            home: homeClub,
+            away: awayClub
+        )
     }
 }

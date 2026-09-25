@@ -12,10 +12,13 @@ struct MatchweekFeature {
         var standings: [Standing]
         var committedWeeks: Int
         var pending: Matchweek.Played?
+        var totals: [String: LeagueLeaders.Counts]
+        var playerClub: [String: String]
         var didFail: Bool
         var tab: Tab
         @Presents var highlight: HighlightFeature.State?
         @Presents var stats: MatchStatsFeature.State?
+        @Presents var leaders: LeadersFeature.State?
         @Presents var player: PlayerDetailFeature.State?
 
         enum Tab: Equatable, Hashable, Sendable, CaseIterable {
@@ -42,10 +45,13 @@ struct MatchweekFeature {
             standings = LeagueTable.zeros(clubIDs: season.clubs.map(\.id))
             committedWeeks = 0
             pending = nil
+            totals = [:]
+            playerClub = [:]
             didFail = false
             tab = .match
             highlight = nil
             stats = nil
+            leaders = nil
             player = nil
         }
 
@@ -151,9 +157,48 @@ struct MatchweekFeature {
             })
         }
 
+        var goalLeaders: [LeagueLeaders.Row] { ranked(\.goals) }
+        var assistLeaders: [LeagueLeaders.Row] { ranked(\.assists) }
+        var saveLeaders: [LeagueLeaders.Row] { ranked(\.saves) }
+
+        fileprivate func starter(_ id: Player.ID) -> Player? {
+            clubs.lazy.compactMap { club in club.starters.first { $0.id == id } }.first
+        }
+
+        private func ranked(_ count: KeyPath<LeagueLeaders.Counts, Int>) -> [LeagueLeaders.Row] {
+            let players = Dictionary(uniqueKeysWithValues: clubs.flatMap(\.starters).map { ($0.id, $0) })
+            let clubsByID = Dictionary(uniqueKeysWithValues: clubs.map { ($0.id, $0) })
+            return totals.compactMap { playerID, counts -> LeagueLeaders.Row? in
+                let value = counts[keyPath: count]
+                guard value > 0, let player = players[playerID] else { return nil }
+                let clubID = playerClub[playerID] ?? ""
+                return LeagueLeaders.Row(
+                    player: player,
+                    clubID: clubID,
+                    clubName: clubsByID[clubID]?.name ?? clubID,
+                    count: value
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count > rhs.count }
+                if lhs.player.fullName != rhs.player.fullName { return lhs.player.fullName < rhs.player.fullName }
+                return lhs.player.id < rhs.player.id
+            }
+        }
+
         fileprivate mutating func commitPendingWeek() {
             guard let pending, !currentWeekIsInTheTable else { return }
             standings = LeagueTable.applying(pending.scorelines, to: standings)
+            for tally in pending.tallies where tally.goals + tally.assists + tally.saves > 0 {
+                var counts = totals[tally.playerID] ?? LeagueLeaders.Counts()
+                counts.goals += tally.goals
+                counts.assists += tally.assists
+                counts.saves += tally.saves
+                totals[tally.playerID] = counts
+                if playerClub[tally.playerID] == nil {
+                    playerClub[tally.playerID] = tally.clubID
+                }
+            }
             committedWeeks = weekIndex + 1
         }
     }
@@ -162,6 +207,7 @@ struct MatchweekFeature {
         case view(View)
         case highlight(PresentationAction<HighlightFeature.Action>)
         case stats(PresentationAction<MatchStatsFeature.Action>)
+        case leaders(PresentationAction<LeadersFeature.Action>)
         case player(PresentationAction<PlayerDetailFeature.Action>)
 
         @CasePathable
@@ -170,6 +216,7 @@ struct MatchweekFeature {
             case replayButtonTapped
             case nextFixtureButtonTapped
             case tabSelected(State.Tab)
+            case leadersButtonTapped
             case playerTapped(Player.ID)
         }
     }
@@ -225,6 +272,7 @@ struct MatchweekFeature {
                 state.pending = nil
                 state.highlight = nil
                 state.stats = nil
+                state.leaders = nil
                 state.player = nil
                 state.didFail = false
                 return .none
@@ -233,8 +281,16 @@ struct MatchweekFeature {
                 state.tab = tab
                 return .none
 
+            case .view(.leadersButtonTapped):
+                state.leaders = LeadersFeature.State(
+                    goals: state.goalLeaders,
+                    assists: state.assistLeaders,
+                    saves: state.saveLeaders
+                )
+                return .none
+
             case let .view(.playerTapped(id)):
-                guard let player = state.userClub?.starters.first(where: { $0.id == id }) else { return .none }
+                guard let player = state.starter(id) else { return .none }
                 state.player = PlayerDetailFeature.State(player: player)
                 return .none
 
@@ -262,7 +318,7 @@ struct MatchweekFeature {
                 state.commitPendingWeek()
                 return .none
 
-            case .stats, .player:
+            case .stats, .leaders, .player:
                 return .none
             }
         }
@@ -271,6 +327,9 @@ struct MatchweekFeature {
         }
         .ifLet(\.$stats, action: \.stats) {
             MatchStatsFeature()
+        }
+        .ifLet(\.$leaders, action: \.leaders) {
+            LeadersFeature()
         }
         .ifLet(\.$player, action: \.player) {
             PlayerDetailFeature()

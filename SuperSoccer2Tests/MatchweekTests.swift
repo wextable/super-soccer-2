@@ -5,6 +5,78 @@ import Testing
 @testable import SuperSoccer2
 
 @Suite
+struct LeagueLeadersTests {
+    @Test func aGoalCreditsTheShooterAndPasserAndASaveCreditsTheKeeper() throws {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let home = try #require(season.clubs.first { $0.id == "manchester-city" })
+        let away = try #require(season.clubs.first { $0.id == "norwich-city" })
+        let shooter = try #require(home.starters.first { $0.position == .forward })
+        let passer = try #require(home.starters.first { $0.id != shooter.id && $0.position == .midfielder })
+        let awayShooter = try #require(away.starters.first { $0.position == .forward })
+        let goal = Shot(
+            id: 0,
+            type: .regular,
+            result: .goal,
+            shooter: shooter,
+            passer: passer,
+            keeper: away.keeper,
+            minute: 4,
+            isHome: true
+        )
+        let penalty = Shot(
+            id: 1,
+            type: .penalty,
+            result: .goal,
+            shooter: shooter,
+            passer: nil,
+            keeper: away.keeper,
+            minute: 12,
+            isHome: true
+        )
+        let save = Shot(
+            id: 2,
+            type: .regular,
+            result: .save,
+            shooter: awayShooter,
+            passer: nil,
+            keeper: home.keeper,
+            minute: 20,
+            isHome: false
+        )
+        let miss = Shot(
+            id: 3,
+            type: .regular,
+            result: .miss,
+            shooter: awayShooter,
+            passer: passer,
+            keeper: home.keeper,
+            minute: 30,
+            isHome: false
+        )
+        let result = MatchResult(
+            homeScore: 2,
+            awayScore: 0,
+            shots: [goal, penalty, save, miss],
+            highlight: goal,
+            commentary: "",
+            seed: 1
+        )
+        let tallies = Dictionary(
+            uniqueKeysWithValues: LeagueLeaders.tally(home: home, away: away, result: result).map { ($0.playerID, $0) }
+        )
+        #expect(tallies[shooter.id]?.goals == 2)
+        #expect(tallies[shooter.id]?.assists == 0)
+        #expect(tallies[shooter.id]?.clubID == home.id)
+        #expect(tallies[passer.id]?.assists == 1)
+        #expect(tallies[passer.id]?.goals == 0)
+        #expect(tallies[home.keeper.id]?.saves == 1)
+        #expect(tallies[home.keeper.id]?.clubID == home.id)
+        #expect(tallies[awayShooter.id] == nil)
+        #expect(tallies[away.keeper.id] == nil)
+    }
+}
+
+@Suite
 struct LeagueTableTests {
     @Test func pointsAndGoalDifferenceComeFromTheScorelines() {
         let lines = [
@@ -90,6 +162,9 @@ struct MatchweekPlayTests {
         )
         #expect(table.allSatisfy { $0.played == 1 })
         #expect(table.map(\.goalDifference).reduce(0, +) == 0)
+        let scored = played.scorelines.reduce(0) { $0 + $1.homeScore + $1.awayScore }
+        #expect(played.tallies.map(\.goals).reduce(0, +) == scored)
+        #expect(played.tallies.map(\.assists).reduce(0, +) <= scored)
         let points = table.map(\.points).reduce(0, +)
         #expect((20...30).contains(points))
         for pair in zip(table, table.dropFirst()) {
@@ -236,7 +311,87 @@ struct MatchweekFeatureTests {
         await store.send(.player(.dismiss)) {
             $0.player = nil
         }
+        let key = try #require(store.state.keyPlayers.first)
+        await store.send(.view(.playerTapped(key.id))) {
+            $0.player = PlayerDetailFeature.State(player: key)
+        }
+        #expect(store.state.player?.player.id == key.id)
+        await store.send(.player(.dismiss)) {
+            $0.player = nil
+        }
         await store.send(.view(.playerTapped("missing")))
+    }
+
+    @Test func leadersStayEmptyUntilTheWeekIsOnTheTable() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        }
+        #expect(MatchweekFeature.State.Tab.allCases.count == 4)
+        #expect(store.state.goalLeaders.isEmpty)
+        #expect(store.state.assistLeaders.isEmpty)
+        #expect(store.state.saveLeaders.isEmpty)
+        await store.send(.view(.leadersButtonTapped)) {
+            $0.leaders = LeadersFeature.State(goals: [], assists: [], saves: [])
+        }
+        #expect(store.state.leaders?.isEmpty == true)
+        await store.send(.leaders(.dismiss)) {
+            $0.leaders = nil
+        }
+    }
+
+    @Test func aPlayedWeekRanksGoalsAssistsAndSaves() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.kickOffButtonTapped))
+        #expect(store.state.goalLeaders.isEmpty)
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+
+        let goals = store.state.goalLeaders
+        let assists = store.state.assistLeaders
+        let saves = store.state.saveLeaders
+        let scored = store.state.scorelines.reduce(0) { $0 + $1.homeScore + $1.awayScore }
+        let clubIDs = Set(store.state.clubs.map(\.id))
+        #expect(goals.map(\.count).reduce(0, +) == scored)
+        #expect(assists.map(\.count).reduce(0, +) <= scored)
+        #expect(goals.allSatisfy { $0.count > 0 && clubIDs.contains($0.clubID) })
+        #expect(assists.allSatisfy { $0.count > 0 && clubIDs.contains($0.clubID) })
+        #expect(saves.allSatisfy { $0.count > 0 && clubIDs.contains($0.clubID) })
+        for board in [goals, assists, saves] {
+            for pair in zip(board, board.dropFirst()) {
+                if pair.0.count == pair.1.count {
+                    #expect(pair.0.player.fullName <= pair.1.player.fullName)
+                } else {
+                    #expect(pair.0.count > pair.1.count)
+                }
+            }
+        }
+
+        let leader = try #require(goals.first)
+        await store.send(.view(.leadersButtonTapped))
+        await store.send(.leaders(.presented(.view(.playerTapped(leader.player.id)))))
+        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player))
+
+        let frozen = (goals, assists, saves)
+        await store.send(.view(.replayButtonTapped))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.goalLeaders == frozen.0)
+        #expect(store.state.assistLeaders == frozen.1)
+        #expect(store.state.saveLeaders == frozen.2)
     }
 
     @Test func theTableUsesTheFullNameAndTheWeekUsesRankAndAShortName() throws {

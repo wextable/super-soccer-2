@@ -11,7 +11,7 @@ Start new work on a new branch from `main`. The user pushes, opens pull requests
 - Match function: `MatchSimulator.simulate` in `SuperSoccer2/Domain/MatchSimulator.swift`. Same squads and seed, same match. Do not change the sim formulas unless asked.
 - Names: `SuperSoccer2/Domain/NameGenerator.swift`. The list and the rolls come from the old app.
 - Draft: `SuperSoccer2/Domain/LeagueDraft.swift`. A launch builds the twenty-club pool and tier draft. Club selection still offers only Manchester City and Norwich City. The week uses every club and `seasonFixtures`.
-- Week: `MatchweekFeature` and `LeagueTable`. Four tabs: Club (a player pushes a detail screen), Table, Week (fixtures and results), and Match (opponent, ratings, key players, kickoff). Points are 3 for a win and 1 for a draw. The table sorts by points, then goal difference, then `Club.overall`. The table updates when the reel is left early or when full-time stats is dismissed.
+- Week: `MatchweekFeature` and `LeagueTable`. Four tabs: Club (a player pushes a detail screen), Table, Week (fixtures and results), and Match (opponent, ratings, key players, kickoff). The table opens Leaders for goals, assists, and saves. A key player opens the same player detail. Points are 3 for a win and 1 for a draw. The table sorts by points, then goal difference, then `Club.overall`. The table updates when the reel is left early or when full-time stats is dismissed.
 - Season check, not a second screen: `SuperSoccer2/Domain/SeasonHarness.swift`.
 - Theme: `SuperSoccer2/Theme.swift`. Screens read `Theme` from the SwiftUI environment. A new look replaces `Theme.starbyte` in `AppView` (`SuperSoccer2/App/SuperSoccer2App.swift`). Do not put colors in a reducer.
 
