@@ -7,6 +7,8 @@ struct PitchView: View {
     var showsPasser: Bool
     var result: ShotResult
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         Color.clear
             .aspectRatio(0.72, contentMode: .fit)
@@ -14,18 +16,18 @@ struct PitchView: View {
                 GeometryReader { proxy in
                     let size = proxy.size
                     ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Theme.pitch)
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Theme.pitchLine, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: theme.metrics.pitchRadius, style: .continuous)
+                            .fill(theme.colors.pitch.color)
+                        RoundedRectangle(cornerRadius: theme.metrics.pitchRadius, style: .continuous)
+                            .stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine)
                         Rectangle()
-                            .fill(Theme.pitchLine)
-                            .frame(height: 2)
+                            .fill(theme.colors.pitchLine.color)
+                            .frame(height: theme.metrics.pitchLine)
                         Circle()
-                            .stroke(Theme.pitchLine, lineWidth: 2)
+                            .stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine)
                             .frame(width: size.width * 0.28, height: size.width * 0.28)
-                        RoundedRectangle(cornerRadius: 2)
-                            .stroke(Theme.pitchLine, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: theme.metrics.shadowRadius, style: .continuous)
+                            .stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine)
                             .frame(width: size.width * 0.5, height: size.height * 0.16)
                             .position(x: size.width * 0.5, y: size.height * 0.08)
                         dot(at: point(0.50, 0.16, in: size), color: defending, diameter: size.width * 0.055)
@@ -34,21 +36,24 @@ struct PitchView: View {
                         }
                         dot(at: point(0.60, 0.64, in: size), color: attacking, diameter: size.width * 0.055)
                         Circle()
-                            .fill(Color.white)
-                            .overlay(Circle().stroke(Theme.tickerBackground, lineWidth: 1))
-                            .frame(width: max(10, size.width * 0.035), height: max(10, size.width * 0.035))
+                            .fill(theme.colors.pitchLine.color)
+                            .overlay(Circle().stroke(theme.colors.tickerBackground.color, lineWidth: theme.metrics.hairline))
+                            .frame(
+                                width: max(theme.metrics.ballMinimum, size.width * 0.035),
+                                height: max(theme.metrics.ballMinimum, size.width * 0.035)
+                            )
                             .position(ballPoint(in: size))
                     }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.pitchRadius, style: .continuous))
             .accessibilityHidden(true)
     }
 
     private func dot(at center: CGPoint, color: Color, diameter: CGFloat) -> some View {
         Circle()
             .fill(color)
-            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
+            .overlay(Circle().stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine))
             .frame(width: diameter, height: diameter)
             .position(center)
     }

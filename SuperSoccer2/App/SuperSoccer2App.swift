@@ -19,6 +19,9 @@ struct SuperSoccer2App: App {
 struct AppView: View {
     @Bindable var store: StoreOf<AppFeature>
 
+    /// The look for every screen. A future theme replaces this value and nothing else.
+    private let theme = Theme.starbyte
+
     var body: some View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             ClubSelectionView(store: store.scope(state: \.selection, action: \.selection))
@@ -28,7 +31,8 @@ struct AppView: View {
                 MatchdayView(store: store)
             }
         }
-        .tint(Theme.accent)
+        .tint(theme.colors.action.color)
+        .environment(\.theme, theme)
     }
 }
 
