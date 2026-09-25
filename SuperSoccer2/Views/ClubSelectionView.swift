@@ -3,40 +3,39 @@ import SwiftUI
 
 struct ClubSelectionView: View {
     @Bindable var store: StoreOf<ClubSelectionFeature>
+    @Environment(\.theme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
                 content
             }
-            .padding(Theme.Space.lg)
+            .padding(theme.space.lg)
             .readingWidth()
         }
         .themeScreen()
         .navigationTitle("Take a club")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(Theme.accent)
+        .tint(theme.colors.action.color)
         .onAppear { store.send(.view(.onAppear)) }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.clubs.count)
         .sensoryFeedback(.selection, trigger: store.lastPickedID)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.xs) {
+        VStack(alignment: .leading, spacing: theme.space.xs) {
             Text("Matchday one")
-                .font(.caption.weight(.semibold).smallCaps())
-                .foregroundStyle(Theme.accent)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.action.color)
             Text("Take a club")
-                .font(.largeTitle.weight(.black))
-                .fontDesign(.rounded)
-                .foregroundStyle(Theme.ink)
+                .font(theme.type.display)
+                .foregroundStyle(theme.colors.text.color)
             Text("The shirt is real. The names are not.")
-                .font(.title3)
-                .fontDesign(.serif)
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.tagline)
+                .foregroundStyle(theme.colors.secondaryText.color)
         }
         .accessibilityElement(children: .combine)
     }
@@ -49,26 +48,26 @@ struct ClubSelectionView: View {
                 systemImage: "exclamationmark.triangle",
                 description: Text("Leave and open the app again.")
             )
-            .frame(maxWidth: .infinity, minHeight: 220)
+            .frame(maxWidth: .infinity, minHeight: theme.metrics.emptyMinHeight)
         } else if store.clubs.isEmpty {
-            VStack(spacing: Theme.Space.sm) {
+            VStack(spacing: theme.space.sm) {
                 ProgressView()
                     .controlSize(.large)
-                    .tint(Theme.accent)
+                    .tint(theme.colors.action.color)
                 Text("Drawing the squads.")
-                    .font(.body)
-                    .foregroundStyle(Theme.inkMuted)
+                    .font(theme.type.body)
+                    .foregroundStyle(theme.colors.secondaryText.color)
             }
-            .frame(maxWidth: .infinity, minHeight: 220)
+            .frame(maxWidth: .infinity, minHeight: theme.metrics.emptyMinHeight)
             .accessibilityElement(children: .combine)
         } else if sizeClass == .regular {
-            HStack(alignment: .top, spacing: Theme.Space.md) {
+            HStack(alignment: .top, spacing: theme.space.md) {
                 ForEach(store.clubs) { club in
                     clubCard(club)
                 }
             }
         } else {
-            VStack(spacing: Theme.Space.md) {
+            VStack(spacing: theme.space.md) {
                 ForEach(store.clubs) { club in
                     clubCard(club)
                 }
@@ -80,42 +79,43 @@ struct ClubSelectionView: View {
         Button {
             store.send(.view(.clubTapped(club.id)))
         } label: {
-            VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            VStack(alignment: .leading, spacing: theme.space.sm) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(club.name)
-                        .font(.title2.weight(.bold))
-                        .fontDesign(.rounded)
-                        .foregroundStyle(Theme.ink)
+                        .font(theme.type.clubName)
+                        .foregroundStyle(theme.colors.text.color)
                         .multilineTextAlignment(.leading)
-                    Spacer(minLength: Theme.Space.sm)
+                    Spacer(minLength: theme.space.sm)
                     Text(role(of: club))
-                        .font(.caption.weight(.semibold).smallCaps())
-                        .foregroundStyle(Theme.accent)
+                        .font(theme.type.eyebrow)
+                        .foregroundStyle(theme.colors.action.color)
                 }
                 Text(club.nickname)
-                    .font(.body)
-                    .fontDesign(.serif)
-                    .foregroundStyle(Theme.inkMuted)
+                    .font(theme.type.tagline)
+                    .foregroundStyle(theme.colors.secondaryText.color)
                 Text("Overall \(club.overall)")
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                Text(club.summaryLine)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Theme.inkMuted)
+                    .font(theme.type.overall)
+                    .foregroundStyle(theme.colors.text.color)
+                Text("Attack \(club.attack)")
+                    .font(theme.type.rating)
+                    .foregroundStyle(theme.colors.text.color)
+                Text("Defense \(club.defense)")
+                    .font(theme.type.rating)
+                    .foregroundStyle(theme.colors.text.color)
             }
-            .padding(Theme.Space.md)
-            .frame(maxWidth: .infinity, minHeight: Theme.control, alignment: .leading)
-            .background(Theme.surface)
+            .padding(theme.space.md)
+            .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
+            .background(theme.colors.card.color)
             .overlay(alignment: .leading) {
                 Rectangle()
                     .fill(club.kit.primary.color)
-                    .frame(width: 6)
+                    .frame(width: theme.metrics.accentBar)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Theme.shadow, radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+            .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(club.name), \(club.nickname), overall \(club.overall), \(role(of: club))")
+        .accessibilityLabel("\(club.name), \(club.nickname), overall \(club.overall), attack \(club.attack), defense \(club.defense), \(role(of: club))")
         .accessibilityHint("Takes the job and opens the squad")
     }
 

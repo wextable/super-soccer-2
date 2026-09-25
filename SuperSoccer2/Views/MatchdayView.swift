@@ -3,24 +3,25 @@ import SwiftUI
 
 struct MatchdayView: View {
     @Bindable var store: StoreOf<MatchdayFeature>
+    @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
                 scoreBanner
                 opponentCard
                 squad
                 kickOff
             }
-            .padding(Theme.Space.lg)
+            .padding(theme.space.lg)
             .readingWidth()
         }
         .themeScreen()
         .navigationTitle(store.userClub.shortName)
         .navigationBarTitleDisplayMode(.inline)
-        .tint(Theme.accent)
+        .tint(theme.colors.action.color)
         .fullScreenCover(
             item: $store.scope(state: \.highlight, action: \.highlight)
         ) { highlightStore in
@@ -30,17 +31,16 @@ struct MatchdayView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.xs) {
+        VStack(alignment: .leading, spacing: theme.space.xs) {
             Text("Your eleven")
-                .font(.caption.weight(.semibold).smallCaps())
-                .foregroundStyle(Theme.accent)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.action.color)
             Text(store.userClub.name)
-                .font(.largeTitle.weight(.black))
-                .fontDesign(.rounded)
-                .foregroundStyle(Theme.ink)
+                .font(theme.type.display)
+                .foregroundStyle(theme.colors.text.color)
             Text("Home · \(store.userClub.summaryLine)")
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.homeLine)
+                .foregroundStyle(theme.colors.secondaryText.color)
         }
     }
 
@@ -48,13 +48,13 @@ struct MatchdayView: View {
     private var scoreBanner: some View {
         if let result = store.result {
             HStack {
-                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                VStack(alignment: .leading, spacing: theme.space.xxs) {
                     Text("Full time")
-                        .font(.caption.weight(.semibold).smallCaps())
-                        .foregroundStyle(Theme.accent)
+                        .font(theme.type.eyebrow)
+                        .foregroundStyle(theme.colors.action.color)
                     Text("\(store.userClub.shortName) \(result.homeScore) – \(result.awayScore) \(store.opponent.shortName)")
-                        .font(.title.monospacedDigit().weight(.bold))
-                        .foregroundStyle(Theme.ink)
+                        .font(theme.type.score)
+                        .foregroundStyle(theme.colors.score.color)
                         .contentTransition(.numericText())
                 }
                 Spacer()
@@ -63,8 +63,8 @@ struct MatchdayView: View {
             .accessibilityLabel("Full time, \(store.userClub.name) \(result.homeScore), \(store.opponent.name) \(result.awayScore)")
         } else {
             Text("No score yet.")
-                .font(.body)
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.body)
+                .foregroundStyle(theme.colors.secondaryText.color)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .themeCard()
         }
@@ -74,60 +74,60 @@ struct MatchdayView: View {
         HStack(spacing: 0) {
             Rectangle()
                 .fill(store.opponent.kit.primary.color)
-                .frame(width: 6)
-            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                .frame(width: theme.metrics.accentBar)
+            VStack(alignment: .leading, spacing: theme.space.xxs) {
                 Text("Away")
-                    .font(.caption.weight(.semibold).smallCaps())
-                    .foregroundStyle(Theme.inkMuted)
+                    .font(theme.type.eyebrow)
+                    .foregroundStyle(theme.colors.secondaryText.color)
                 Text(store.opponent.name)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
+                    .font(theme.type.opponentName)
+                    .foregroundStyle(theme.colors.text.color)
                 Text(store.opponent.summaryLine)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Theme.inkMuted)
+                    .font(theme.type.captionNumber)
+                    .foregroundStyle(theme.colors.secondaryText.color)
             }
-            .padding(Theme.Space.md)
+            .padding(theme.space.md)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Theme.shadow, radius: 2, y: 1)
+        .background(theme.colors.card.color)
+        .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+        .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
     }
 
     private var squad: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+        VStack(alignment: .leading, spacing: theme.space.sm) {
             Text("Starters")
-                .font(.caption.weight(.semibold).smallCaps())
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
             VStack(spacing: 0) {
                 ForEach(Array(store.userClub.starters.enumerated()), id: \.element.id) { index, player in
-                    HStack(spacing: Theme.Space.sm) {
+                    HStack(spacing: theme.space.sm) {
                         Text(player.position.label)
-                            .font(.caption.weight(.semibold).smallCaps())
-                            .foregroundStyle(Theme.accent)
-                            .frame(width: 44, alignment: .leading)
+                            .font(theme.type.eyebrow)
+                            .foregroundStyle(theme.colors.action.color)
+                            .frame(width: theme.metrics.minimumControl, alignment: .leading)
                         Text(player.fullName)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Theme.ink)
+                            .font(theme.type.playerName)
+                            .foregroundStyle(theme.colors.text.color)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Text("\(player.overall)")
-                            .font(.body.monospacedDigit().weight(.bold))
-                            .foregroundStyle(Theme.ink)
+                            .font(theme.type.playerOverall)
+                            .foregroundStyle(theme.colors.text.color)
                     }
-                    .frame(minHeight: Theme.control)
+                    .frame(minHeight: theme.metrics.minimumControl)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(player.fullName), \(player.position.label), overall \(player.overall)")
                     if index < store.userClub.starters.count - 1 {
                         Rectangle()
-                            .fill(Theme.line)
-                            .frame(height: 1)
+                            .fill(theme.colors.hairline.color)
+                            .frame(height: theme.metrics.hairline)
                     }
                 }
             }
-            .padding(.horizontal, Theme.Space.md)
-            .background(Theme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Theme.shadow, radius: 2, y: 1)
+            .padding(.horizontal, theme.space.md)
+            .background(theme.colors.card.color)
+            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+            .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
         }
     }
 
@@ -136,13 +136,8 @@ struct MatchdayView: View {
             store.send(.view(.kickOffButtonTapped))
         } label: {
             Text(store.result == nil ? "Kick off" : "Watch the beat")
-                .font(.body.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: Theme.control)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.accentInk)
-        .background(Theme.accent)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .buttonStyle(ThemeActionButtonStyle())
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.result == nil)
     }
 }

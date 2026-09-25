@@ -55,6 +55,27 @@ struct NameAndSquadTests {
         #expect(first[0].starters.filter { $0.position == .keeper }.count == 1)
     }
 
+    @Test func teamOverallIsTheMeanOfAttackAndDefense() {
+        #expect(Club.overall(attack: 92, defense: 79) == 86)
+        #expect(Club.overall(attack: 71, defense: 68) == 70)
+        #expect(Club.overall(attack: 0, defense: 0) == 1)
+        #expect(Club.overall(attack: 200, defense: 200) == 99)
+        #expect(Club.overall(attack: 80, defense: 81) == 81)
+        #expect(Club.overall(attack: 80, defense: 83) == 82)
+
+        let clubs = SquadCatalog.makePair(seed: 42)
+        let city = clubs[0]
+        let norwich = clubs[1]
+        #expect(city.overall == Club.overall(attack: city.attack, defense: city.defense))
+        #expect(norwich.overall == Club.overall(attack: norwich.attack, defense: norwich.defense))
+        #expect(city.attack == 92)
+        #expect(city.defense == 79)
+        #expect(norwich.attack == 71)
+        #expect(norwich.defense == 68)
+        let playerMean = city.starters.reduce(0) { $0 + $1.overall } / city.starters.count
+        #expect(city.overall != playerMean)
+    }
+
     @Test func aNewSeedRollsANewSquad() {
         let first = SquadCatalog.makePair(seed: 1)
         let second = SquadCatalog.makePair(seed: 2)

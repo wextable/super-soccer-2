@@ -3,10 +3,11 @@ import SwiftUI
 
 struct HighlightView: View {
     @Bindable var store: StoreOf<HighlightFeature>
+    @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
+        VStack(alignment: .leading, spacing: theme.space.md) {
             scoreboard
             ZStack(alignment: .bottom) {
                 PitchView(
@@ -17,21 +18,16 @@ struct HighlightView: View {
                     result: store.result
                 )
                 ticker
-                    .padding(Theme.Space.sm)
+                    .padding(theme.space.sm)
             }
             Button {
                 store.send(.view(.backButtonTapped))
             } label: {
                 Text("Back to the squad")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: Theme.control)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(Theme.accentInk)
-            .background(Theme.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .buttonStyle(ThemeActionButtonStyle())
         }
-        .padding(Theme.Space.lg)
+        .padding(theme.space.lg)
         .readingWidth()
         .themeScreen()
         .onAppear {
@@ -43,36 +39,38 @@ struct HighlightView: View {
     private var scoreboard: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(store.homeShort)
-                .font(.title3.monospaced().weight(.bold))
+                .font(theme.type.scoreSide)
             Text("\(store.homeScore)")
-                .font(.largeTitle.monospacedDigit().weight(.black))
+                .font(theme.type.scoreHero)
+                .foregroundStyle(theme.colors.score.color)
                 .contentTransition(.numericText())
             Text("–")
-                .font(.title2.monospaced())
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.scoreSide)
+                .foregroundStyle(theme.colors.secondaryText.color)
             Text("\(store.awayScore)")
-                .font(.largeTitle.monospacedDigit().weight(.black))
+                .font(theme.type.scoreHero)
+                .foregroundStyle(theme.colors.score.color)
                 .contentTransition(.numericText())
             Text(store.awayShort)
-                .font(.title3.monospaced().weight(.bold))
+                .font(theme.type.scoreSide)
             Spacer()
             Text("\(store.minute)'")
-                .font(.title3.monospaced().weight(.semibold))
-                .foregroundStyle(Theme.inkMuted)
+                .font(theme.type.minute)
+                .foregroundStyle(theme.colors.secondaryText.color)
         }
-        .foregroundStyle(Theme.ink)
+        .foregroundStyle(theme.colors.text.color)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Full time \(store.homeShort) \(store.homeScore), \(store.awayShort) \(store.awayScore), minute \(store.minute)")
     }
 
     private var ticker: some View {
         Text(store.sentenceVisible ? store.commentary : "…")
-            .font(.body.monospaced())
-            .foregroundStyle(Theme.ticker)
+            .font(theme.type.ticker)
+            .foregroundStyle(theme.colors.ticker.color)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.Space.md)
-            .background(Theme.tickerBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(theme.space.md)
+            .background(theme.colors.tickerBackground.color)
+            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
             .accessibilityLabel(store.commentary)
     }
 
