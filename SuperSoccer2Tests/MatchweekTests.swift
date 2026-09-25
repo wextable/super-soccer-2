@@ -414,6 +414,61 @@ struct MatchweekFeatureTests {
         #expect(cityPlace == 1)
     }
 
+    @Test func theFinishedFixtureListStoresAChampionAndOpensTheChampionship() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        #expect(state.weeks.count == 38)
+        state.weekIndex = state.weeks.count - 1
+        let store = TestStore(initialState: state) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        store.exhaustivity = .off
+
+        #expect(store.state.hasNextFixture == false)
+        #expect(store.state.seasonIsOver == false)
+        #expect(store.state.record == nil)
+        #expect(MatchweekFeature.State.Tab.allCases.count == 4)
+        await store.send(.view(.championshipButtonTapped))
+        #expect(store.state.championship == nil)
+
+        await store.send(.view(.kickOffButtonTapped))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+
+        #expect(store.state.seasonIsOver)
+        #expect(store.state.hasNextFixture == false)
+        let record = try #require(store.state.record)
+        #expect(record.championClubID == store.state.table.first?.clubID)
+        #expect(record.awards.map(\.kind) == AwardKind.allCases)
+        let boot = try #require(record.awards.first { $0.kind == .goldenBoot })
+        #expect(boot.stats.goals == (store.state.totals.values.map(\.goals).max() ?? 0))
+
+        await store.send(.view(.nextFixtureButtonTapped))
+        #expect(store.state.weekIndex == state.weeks.count - 1)
+        #expect(store.state.record == record)
+
+        await store.send(.view(.championshipButtonTapped))
+        let championID = record.championClubID
+        #expect(store.state.championship?.record == record)
+        #expect(store.state.championship?.goals.map(\.player.id) == store.state.goalLeaders.filter { $0.clubID == championID }.map(\.player.id))
+        await store.send(.championship(.presented(.view(.awardTapped(.goldenBoot)))))
+        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player))
+
+        await store.send(.view(.replayButtonTapped))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.record == record)
+        #expect(store.state.standings.allSatisfy { $0.played == 1 })
+    }
+
     @Test func theLastWeekDoesNotStartAnotherSeason() async {
         let season = LeagueDraft.makeLeague(seed: 1)
         var state = MatchweekFeature.State(userClubID: "norwich-city", season: season)

@@ -153,6 +153,12 @@ struct TableTab: View {
                     store.send(.view(.leadersButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
+                if store.seasonIsOver {
+                    Button("Championship") {
+                        store.send(.view(.championshipButtonTapped))
+                    }
+                    .buttonStyle(ThemeActionButtonStyle())
+                }
                 WeekCard {
                     tableRow(club: "Club", played: "P", points: "Pts", difference: "GD", emphasized: false, isHeader: true)
                     ForEach(store.table) { row in
@@ -311,6 +317,10 @@ struct WeekTab: View {
             Text("That's the season.")
                 .font(theme.type.body)
                 .foregroundStyle(theme.colors.secondaryText.color)
+            Button("Championship") {
+                store.send(.view(.championshipButtonTapped))
+            }
+            .buttonStyle(ThemeActionButtonStyle())
         }
     }
 }
@@ -460,6 +470,10 @@ struct MatchTab: View {
                     .font(theme.type.body)
                     .foregroundStyle(theme.colors.secondaryText.color)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Championship") {
+                    store.send(.view(.championshipButtonTapped))
+                }
+                .buttonStyle(ThemeActionButtonStyle())
             }
         }
     }
