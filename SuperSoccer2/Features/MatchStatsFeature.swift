@@ -14,7 +14,8 @@ struct MatchStatsFeature {
         struct Row: Equatable, Identifiable, Sendable {
             var id: Int
             var minute: Int
-            var shooter: String
+            /// Shooter on a goal. Keeper on a save.
+            var name: String
             var result: ShotResult
             var isPenalty: Bool
             var isHome: Bool
@@ -32,7 +33,9 @@ struct MatchStatsFeature {
             self.title = title
             self.homeShort = homeShort
             self.awayShort = awayShort
-            rows = shots.enumerated()
+            rows = shots
+                .enumerated()
+                .filter { $0.element.result != .miss }
                 .sorted { lhs, rhs in
                     if lhs.element.minute != rhs.element.minute {
                         return lhs.element.minute < rhs.element.minute
@@ -45,7 +48,7 @@ struct MatchStatsFeature {
                     return Row(
                         id: index,
                         minute: shot.minute,
-                        shooter: shot.shooter.fullName,
+                        name: shot.result == .save ? shot.keeper.fullName : shot.shooter.fullName,
                         result: shot.result,
                         isPenalty: shot.type == .penalty,
                         isHome: shot.isHome

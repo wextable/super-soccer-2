@@ -30,6 +30,8 @@ extension Theme {
         var card: AppearanceColor
         var hairline: AppearanceColor
         var shadow: AppearanceColor
+        /// Debug-only controls. Not the action cyan.
+        var danger: AppearanceColor
         /// Commentary stays the bright cyan on a near-black strip in both appearances.
         var ticker: AppearanceColor
         var tickerBackground: AppearanceColor
@@ -46,6 +48,7 @@ extension Theme {
             card: AppearanceColor(light: .byte(247, 251, 246), dark: .byte(23, 33, 27)),
             hairline: AppearanceColor(light: .byte(213, 224, 216), dark: .byte(42, 58, 48)),
             shadow: AppearanceColor(light: .byte(0, 0, 0, 0.08), dark: .byte(0, 0, 0, 0.08)),
+            danger: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 99, 99)),
             ticker: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
             tickerBackground: AppearanceColor(light: .byte(7, 17, 12), dark: .byte(7, 17, 12))
         )
@@ -175,6 +178,19 @@ extension EnvironmentValues {
 extension KitColor {
     var color: Color {
         Color(red: red, green: green, blue: blue)
+    }
+}
+
+struct ThemeDangerButtonStyle: ButtonStyle {
+    @Environment(\.theme) private var theme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(theme.type.button)
+            .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl)
+            .foregroundStyle(theme.colors.actionLabel.color)
+            .background(theme.colors.danger.color)
+            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.buttonRadius, style: .continuous))
     }
 }
 

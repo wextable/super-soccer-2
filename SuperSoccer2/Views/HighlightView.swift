@@ -33,6 +33,10 @@ struct HighlightView: View {
                     store.send(.view(.statsButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
+                Button("Back to week") {
+                    store.send(.view(.backButtonTapped))
+                }
+                .buttonStyle(ThemeActionButtonStyle())
             } else {
                 Button("Skip") {
                     store.send(.view(.skipButtonTapped))

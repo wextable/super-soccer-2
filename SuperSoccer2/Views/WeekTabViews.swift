@@ -359,6 +359,7 @@ struct MatchTab: View {
             .readingWidth()
         }
         .themeScreen()
+        .alert($store.scope(state: \.seasonAlert, action: \.seasonAlert))
     }
 
     private var header: some View {
@@ -374,8 +375,35 @@ struct MatchTab: View {
                     .font(theme.type.homeLine)
                     .foregroundStyle(theme.colors.secondaryText.color)
             }
+            if let homeShort = store.playedHomeShort,
+               let awayShort = store.playedAwayShort,
+               let homeScore = store.playedHomeScore,
+               let awayScore = store.playedAwayScore {
+                playedScore(homeShort: homeShort, awayShort: awayShort, homeScore: homeScore, awayScore: awayScore)
+            }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private func playedScore(homeShort: String, awayShort: String, homeScore: Int, awayScore: Int) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
+            Text(homeShort)
+                .font(theme.type.scoreSide)
+            Text("\(homeScore)")
+                .font(theme.type.score)
+                .foregroundStyle(theme.colors.score.color)
+            Text("–")
+                .font(theme.type.scoreSide)
+                .foregroundStyle(theme.colors.secondaryText.color)
+            Text("\(awayScore)")
+                .font(theme.type.score)
+                .foregroundStyle(theme.colors.score.color)
+            Text(awayShort)
+                .font(theme.type.scoreSide)
+        }
+        .foregroundStyle(theme.colors.text.color)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Full time, \(homeShort) \(homeScore), \(awayShort) \(awayScore)")
     }
 
     private func opponentCard(_ opponent: Club) -> some View {
@@ -452,6 +480,10 @@ struct MatchTab: View {
                     store.send(.view(.kickOffButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
+                Button("Simulate match") {
+                    store.send(.view(.simulateMatchButtonTapped))
+                }
+                .buttonStyle(ThemeActionButtonStyle())
             }
             if store.currentWeekIsInTheTable, store.pending != nil {
                 Button("Watch the beat") {
@@ -475,6 +507,14 @@ struct MatchTab: View {
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
+            #if DEBUG
+            if !store.seasonIsOver {
+                Button("SIMULATE SEASON") {
+                    store.send(.view(.simulateSeasonButtonTapped))
+                }
+                .buttonStyle(ThemeDangerButtonStyle())
+            }
+            #endif
         }
     }
 }

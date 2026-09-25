@@ -8,6 +8,7 @@ struct LeadersFeature {
         var goals: [LeagueLeaders.Row]
         var assists: [LeagueLeaders.Row]
         var saves: [LeagueLeaders.Row]
+        var userClubID: String
         @Presents var player: PlayerDetailFeature.State?
 
         var isEmpty: Bool {
