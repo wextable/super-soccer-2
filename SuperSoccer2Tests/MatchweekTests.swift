@@ -152,7 +152,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.standings == afterWeek)
     }
 
-    @Test func skipEndsTheReelAndBackStillUpdatesTheTable() async throws {
+    @Test func skipThenFullTimeStatsUpdatesTheTableOnce() async throws {
         let season = LeagueDraft.makeLeague(seed: 42)
         let store = TestStore(initialState: MatchweekFeature.State(userClubID: "norwich-city", season: season)) {
             MatchweekFeature()
@@ -164,7 +164,9 @@ struct MatchweekFeatureTests {
         await store.send(.view(.kickOffButtonTapped))
         let finalHome = try #require(store.state.highlight?.finalHomeScore)
         let finalAway = try #require(store.state.highlight?.finalAwayScore)
+        let shots = try #require(store.state.pending?.userMatch.shots)
         #expect(store.state.standings.allSatisfy { $0.played == 0 })
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore == nil })
 
         await store.send(.highlight(.presented(.view(.skipButtonTapped))))
         #expect(store.state.highlight?.phase == .fullTime)
@@ -172,14 +174,63 @@ struct MatchweekFeatureTests {
         #expect(store.state.highlight?.homeScore == finalHome)
         #expect(store.state.highlight?.awayScore == finalAway)
         #expect(store.state.highlight != nil)
+        #expect(store.state.stats == nil)
         #expect(store.state.standings.allSatisfy { $0.played == 0 })
 
-        await store.send(.highlight(.presented(.view(.backButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        let rows = try #require(store.state.stats?.rows)
+        #expect(store.state.highlight != nil)
+        #expect(store.state.stats?.title == "Full time")
+        #expect(rows.map(\.minute) == shots.sorted { $0.minute < $1.minute }.map(\.minute))
+        #expect(rows.map(\.result) == shots.sorted { $0.minute < $1.minute }.map(\.result))
+        #expect(store.state.standings.allSatisfy { $0.played == 0 })
+
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
         await store.skipReceivedActions()
         #expect(store.state.highlight == nil)
+        #expect(store.state.stats == nil)
         #expect(store.state.currentWeekIsInTheTable)
         #expect(store.state.standings.allSatisfy { $0.played == 1 })
         #expect(store.state.scorelines.count == 10)
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore != nil })
+
+        let afterWeek = store.state.standings
+        await store.send(.view(.replayButtonTapped))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.standings == afterWeek)
+        #expect(store.state.highlight == nil)
+        #expect(store.state.stats == nil)
+    }
+
+    @Test func theWeekIsFourTabsAndAPlayerPushes() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        }
+        #expect(MatchweekFeature.State.Tab.allCases == [.club, .table, .week, .match])
+        #expect(store.state.tab == .match)
+        #expect(store.state.weekLines.count == 10)
+        #expect(store.state.keyPlayers.count == 3)
+        let best = try #require(store.state.opponent?.starters.map(\.overall).max())
+        #expect(store.state.keyPlayers.first?.overall == best)
+        let player = try #require(store.state.userClub?.starters.first)
+
+        await store.send(.view(.tabSelected(.club))) {
+            $0.tab = .club
+        }
+        await store.send(.view(.playerTapped(player.id))) {
+            $0.player = PlayerDetailFeature.State(player: player)
+        }
+        #expect(store.state.player?.player.fullName == player.fullName)
+        await store.send(.player(.dismiss)) {
+            $0.player = nil
+        }
+        await store.send(.view(.playerTapped("missing")))
     }
 
     @Test func theLastWeekDoesNotStartAnotherSeason() async {

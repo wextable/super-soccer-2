@@ -1,6 +1,6 @@
 # SuperSoccer2
 
-An iPhone and iPad soccer management game. You take Manchester City or Norwich City. Each week you watch your fixture, and the other matches that week land on the table as scorelines. The match is simulated. You do not control a player on the ball.
+An iPhone and iPad soccer management game. You take Manchester City or Norwich City. The week is four tabs: Club, Table, Week, and Match. Kickoff plays your fixture, then a full-time stats screen, and the other matches that week land on the table. The match is simulated. You do not control a player on the ball.
 
 ## Open and run
 
