@@ -141,6 +141,18 @@ struct HighlightFeature {
             showsPasser = false
         }
 
+        /// The same frame the clock reaches after the last shot.
+        fileprivate mutating func finishReel() {
+            if let last = shots.indices.last {
+                index = last
+                let shot = shots[last]
+                minute = shot.minute
+                attackingIsHome = shot.isHome
+                result = shot.result
+            }
+            showFullTime()
+        }
+
         private func line(for shot: Shot) -> String {
             Commentary.line(
                 shot: shot,
@@ -171,6 +183,7 @@ struct HighlightFeature {
         enum View {
             case onAppear(reduceMotion: Bool)
             case advance
+            case skipButtonTapped
             case backButtonTapped
         }
 
@@ -219,6 +232,11 @@ struct HighlightFeature {
                 case .fullTime:
                     return .none
                 }
+
+            case .view(.skipButtonTapped):
+                guard state.phase != .fullTime else { return .none }
+                state.finishReel()
+                return .cancel(id: CancelID.beat)
 
             case .view(.backButtonTapped):
                 return .merge(
