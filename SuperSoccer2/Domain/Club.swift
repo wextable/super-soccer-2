@@ -14,7 +14,10 @@ struct Kit: Equatable, Sendable {
 struct Club: Equatable, Sendable, Identifiable {
     var id: String
     var name: String
+    /// Three-letter code used on the scoreboard.
     var shortName: String
+    /// Readable week-list name, such as “Man City” or “Norwich”. Not the three-letter code.
+    var listName: String
     var nickname: String
     var kit: Kit
     var starters: [Player]

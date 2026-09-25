@@ -209,6 +209,7 @@ enum LeagueDraft {
             id: template.id,
             name: template.name,
             shortName: template.shortName,
+            listName: template.listName,
             nickname: template.nickname,
             kit: template.kit,
             starters: roster.filter(\.isStarter)
@@ -284,38 +285,40 @@ private struct Template {
     var id: String
     var name: String
     var shortName: String
+    var listName: String
     var nickname: String
     var kit: Kit
 }
 
 private extension LeagueDraft {
     static let templates: [Template] = [
-        club("manchester-city", "Manchester City", "MCT", "Citizens", 100, 173, 221, 2, 33, 63),
-        club("liverpool", "Liverpool", "LIV", "Reds", 219, 10, 22, 21, 150, 127),
-        club("chelsea", "Chelsea", "CHE", "Blues", 8, 71, 147, 240, 228, 53),
-        club("arsenal", "Arsenal", "ARS", "Gunners", 237, 11, 25, 255, 255, 255),
-        club("manchester-united", "Manchester United", "MUN", "Red Devils", 252, 13, 27, 254, 228, 51),
-        club("west-ham", "West Ham", "WHM", "Irons", 151, 6, 20, 157, 208, 242),
-        club("tottenham", "Tottenham", "TOT", "Lilywhites", 255, 255, 255, 1, 24, 76),
-        club("wolverhampton", "Wolverhampton", "WLV", "Wolves", 253, 153, 39, 0, 0, 0),
-        club("leicester-city", "Leicester City", "LCT", "Foxes", 11, 36, 251, 255, 255, 255),
-        club("crystal-palace", "Crystal Palace", "CPL", "Eagles", 252, 13, 27, 14, 77, 251),
-        club("brighton", "Brighton", "BRT", "Seagulls", 10, 33, 238, 255, 255, 255),
-        club("aston-villa", "Aston Villa", "AVL", "Lions", 166, 204, 253, 132, 4, 30),
-        club("southampton", "Southampton", "STH", "Saints", 252, 13, 27, 224, 224, 224),
-        club("brentford", "Brentford", "BRF", "Bees", 252, 13, 27, 255, 255, 255),
-        club("everton", "Everton", "EVT", "Blues", 8, 30, 219, 255, 255, 255),
-        club("leeds-united", "Leeds United", "LEE", "Whites", 255, 255, 255, 20, 36, 86),
-        club("watford", "Watford", "WTF", "Hornets", 253, 226, 58, 0, 0, 0),
-        club("burnley", "Burnley", "BRN", "Clarets", 128, 3, 29, 132, 193, 253),
-        club("newcastle-united", "Newcastle United", "NCS", "Magpies", 0, 0, 0, 255, 255, 255),
-        club("norwich-city", "Norwich City", "NWC", "Canaries", 255, 240, 53, 21, 152, 70),
+        club("manchester-city", "Manchester City", "MCT", "Man City", "Citizens", 100, 173, 221, 2, 33, 63),
+        club("liverpool", "Liverpool", "LIV", "Liverpool", "Reds", 219, 10, 22, 21, 150, 127),
+        club("chelsea", "Chelsea", "CHE", "Chelsea", "Blues", 8, 71, 147, 240, 228, 53),
+        club("arsenal", "Arsenal", "ARS", "Arsenal", "Gunners", 237, 11, 25, 255, 255, 255),
+        club("manchester-united", "Manchester United", "MUN", "Man United", "Red Devils", 252, 13, 27, 254, 228, 51),
+        club("west-ham", "West Ham", "WHM", "West Ham", "Irons", 151, 6, 20, 157, 208, 242),
+        club("tottenham", "Tottenham", "TOT", "Tottenham", "Lilywhites", 255, 255, 255, 1, 24, 76),
+        club("wolverhampton", "Wolverhampton", "WLV", "Wolves", "Wolves", 253, 153, 39, 0, 0, 0),
+        club("leicester-city", "Leicester City", "LCT", "Leicester", "Foxes", 11, 36, 251, 255, 255, 255),
+        club("crystal-palace", "Crystal Palace", "CPL", "Palace", "Eagles", 252, 13, 27, 14, 77, 251),
+        club("brighton", "Brighton", "BRT", "Brighton", "Seagulls", 10, 33, 238, 255, 255, 255),
+        club("aston-villa", "Aston Villa", "AVL", "Villa", "Lions", 166, 204, 253, 132, 4, 30),
+        club("southampton", "Southampton", "STH", "Southampton", "Saints", 252, 13, 27, 224, 224, 224),
+        club("brentford", "Brentford", "BRF", "Brentford", "Bees", 252, 13, 27, 255, 255, 255),
+        club("everton", "Everton", "EVT", "Everton", "Blues", 8, 30, 219, 255, 255, 255),
+        club("leeds-united", "Leeds United", "LEE", "Leeds", "Whites", 255, 255, 255, 20, 36, 86),
+        club("watford", "Watford", "WTF", "Watford", "Hornets", 253, 226, 58, 0, 0, 0),
+        club("burnley", "Burnley", "BRN", "Burnley", "Clarets", 128, 3, 29, 132, 193, 253),
+        club("newcastle-united", "Newcastle United", "NCS", "Newcastle", "Magpies", 0, 0, 0, 255, 255, 255),
+        club("norwich-city", "Norwich City", "NWC", "Norwich", "Canaries", 255, 240, 53, 21, 152, 70),
     ]
 
     static func club(
         _ id: String,
         _ name: String,
         _ shortName: String,
+        _ listName: String,
         _ nickname: String,
         _ red: Double,
         _ green: Double,
@@ -328,6 +331,7 @@ private extension LeagueDraft {
             id: id,
             name: name,
             shortName: shortName,
+            listName: listName,
             nickname: nickname,
             kit: Kit(
                 primary: KitColor(red: red / 255, green: green / 255, blue: blue / 255),
