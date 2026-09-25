@@ -385,45 +385,72 @@ struct AppFeatureTests {
 
         await store.send(.selection(.view(.onAppear)))
         #expect(store.state.selection.clubs.map(\.name) == ["Manchester City", "Norwich City"])
+        #expect(store.state.selection.season?.clubs.count == 20)
 
         await store.send(.selection(.view(.clubTapped("norwich-city"))))
         await store.skipReceivedActions()
         guard let pathID = store.state.path.ids.first else {
-            Issue.record("Matchday was not pushed")
+            Issue.record("The week was not pushed")
             return
         }
-        let matchday = store.state.path[id: pathID, case: \.matchday]
-        #expect(matchday?.userClub.name == "Norwich City")
-        #expect(matchday?.opponent.name == "Manchester City")
+        let week = try #require(store.state.path[id: pathID, case: \.matchweek])
+        let fixture = try #require(week.fixture)
+        #expect(week.userClub?.name == "Norwich City")
+        #expect(week.clubs.count == 20)
+        #expect(fixture.homeID == "norwich-city" || fixture.awayID == "norwich-city")
+        #expect(week.opponent?.id != "norwich-city")
+        #expect(week.standings.allSatisfy { $0.played == 0 })
 
-        await store.send(.path(.element(id: pathID, action: .matchday(.view(.kickOffButtonTapped)))))
-        let played = try #require(store.state.path[id: pathID, case: \.matchday])
-        let shot = try #require(played.result?.shots.first)
+        await store.send(.path(.element(id: pathID, action: .matchweek(.view(.kickOffButtonTapped)))))
+        let played = try #require(store.state.path[id: pathID, case: \.matchweek])
+        let userMatch = try #require(played.pending?.userMatch)
+        let shot = try #require(userMatch.shots.first)
+        let home = try #require(played.pending?.home)
+        let away = try #require(played.pending?.away)
+        #expect(played.pending?.scorelines.count == 10)
+        #expect(played.scorelines.isEmpty)
+        #expect(played.standings.allSatisfy { $0.played == 0 })
         #expect(played.highlight?.sentenceVisible == false)
         #expect(played.highlight?.phase == .incoming)
         #expect(played.highlight?.homeScore == 0)
         #expect(played.highlight?.awayScore == 0)
-        #expect(played.highlight?.finalHomeScore == played.result?.homeScore)
-        #expect(played.highlight?.finalAwayScore == played.result?.awayScore)
-        #expect(played.highlight?.shots.map(\.id) == played.result?.shots.map(\.id))
+        #expect(played.highlight?.finalHomeScore == userMatch.homeScore)
+        #expect(played.highlight?.finalAwayScore == userMatch.awayScore)
+        #expect(played.highlight?.shots.map(\.id) == userMatch.shots.map(\.id))
         #expect(played.highlight?.minute == shot.minute)
         #expect(
             played.highlight?.commentary == Commentary.line(
                 shot: shot,
-                attackingClub: shot.isHome ? played.userClub.name : played.opponent.name,
-                defendingClub: shot.isHome ? played.opponent.name : played.userClub.name
+                attackingClub: shot.isHome ? home.name : away.name,
+                defendingClub: shot.isHome ? away.name : home.name
             )
         )
-        #expect(played.result?.commentary.contains("of ") == true)
 
         await store.send(.path(.element(
             id: pathID,
-            action: .matchday(.highlight(.presented(.view(.backButtonTapped))))
+            action: .matchweek(.highlight(.presented(.view(.backButtonTapped))))
         )))
         await store.skipReceivedActions()
-        let returned = store.state.path[id: pathID, case: \.matchday]
-        #expect(returned?.highlight == nil)
-        #expect(returned?.result == played.result)
+        let returned = try #require(store.state.path[id: pathID, case: \.matchweek])
+        #expect(returned.highlight == nil)
+        #expect(returned.currentWeekIsInTheTable)
+        #expect(returned.standings.allSatisfy { $0.played == 1 })
+        #expect(returned.scorelines.count == 10)
+        #expect(returned.pending?.userMatch == userMatch)
+        let userLine = try #require(returned.pending?.scorelines.first { $0.involves("norwich-city") })
+        let userStanding = try #require(returned.standings.first { $0.clubID == "norwich-city" })
+        let scored = userLine.homeID == "norwich-city" ? userLine.homeScore : userLine.awayScore
+        let conceded = userLine.homeID == "norwich-city" ? userLine.awayScore : userLine.homeScore
+        let points = scored > conceded ? 3 : (scored == conceded ? 1 : 0)
+        #expect(userStanding.points == points)
+        #expect(userStanding.goalDifference == scored - conceded)
+
+        await store.send(.path(.element(id: pathID, action: .matchweek(.view(.nextFixtureButtonTapped)))))
+        let next = try #require(store.state.path[id: pathID, case: \.matchweek])
+        #expect(next.weekIndex == 1)
+        #expect(next.currentWeekIsInTheTable == false)
+        #expect(next.pending == nil)
+        #expect(next.standings.allSatisfy { $0.played == 1 })
     }
 }
 

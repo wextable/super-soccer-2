@@ -6,6 +6,7 @@ struct ClubSelectionFeature {
     @ObservableState
     struct State: Equatable {
         var clubs: [Club] = []
+        var season: LeagueDraft.Season?
         var squadSeed: UInt64?
         var lastPickedID: String?
         var didFailToLoad = false
@@ -33,13 +34,19 @@ struct ClubSelectionFeature {
             case .view(.onAppear):
                 guard state.clubs.isEmpty else { return .none }
                 let seed = entropy.nextSeed()
-                let clubs = SquadCatalog.makePair(seed: seed)
-                guard clubs.count == 2, clubs.allSatisfy({ $0.starters.count == 11 }) else {
+                let season = LeagueDraft.makeLeague(seed: seed)
+                guard
+                    let city = season.clubs.first(where: { $0.id == "manchester-city" }),
+                    let norwich = season.clubs.first(where: { $0.id == "norwich-city" }),
+                    season.clubs.count == LeagueDraft.clubCount,
+                    [city, norwich].allSatisfy({ $0.starters.count == 11 })
+                else {
                     state.didFailToLoad = true
                     return .none
                 }
                 state.squadSeed = seed
-                state.clubs = clubs
+                state.season = season
+                state.clubs = [city, norwich]
                 state.didFailToLoad = false
                 return .none
 

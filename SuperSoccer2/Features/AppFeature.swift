@@ -16,7 +16,7 @@ struct AppFeature {
 
     @Reducer(state: .equatable)
     enum Path {
-        case matchday(MatchdayFeature)
+        case matchweek(MatchweekFeature)
     }
 
     var body: some ReducerOf<Self> {
@@ -27,11 +27,11 @@ struct AppFeature {
             switch action {
             case let .selection(.delegate(.clubPicked(id))):
                 guard state.path.isEmpty,
-                      let user = state.selection.clubs.first(where: { $0.id == id }),
-                      let opponent = state.selection.clubs.first(where: { $0.id != id })
+                      let season = state.selection.season,
+                      state.selection.clubs.contains(where: { $0.id == id })
                 else { return .none }
                 state.path.append(
-                    .matchday(MatchdayFeature.State(userClub: user, opponent: opponent))
+                    .matchweek(MatchweekFeature.State(userClubID: id, season: season))
                 )
                 return .none
 

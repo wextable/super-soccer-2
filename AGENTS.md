@@ -1,6 +1,6 @@
 # SuperSoccer2 — read this first
 
-iPhone and iPad soccer management. TCA, SwiftUI, and Swift concurrency. iOS 18+, Swift 6. The slice is two clubs, one match, one highlight. There is no league screen.
+iPhone and iPad soccer management. TCA, SwiftUI, and Swift concurrency. iOS 18+, Swift 6. The user plays as Manchester City or Norwich City. Each week their fixture is the highlight reel. The other fixtures that week are scorelines, and the table records the week. There is no second season.
 
 ## Git
 
@@ -10,8 +10,9 @@ Start new work on a new branch from `main`. The user pushes, opens pull requests
 
 - Match function: `MatchSimulator.simulate` in `SuperSoccer2/Domain/MatchSimulator.swift`. Same squads and seed, same match. Do not change the sim formulas unless asked.
 - Names: `SuperSoccer2/Domain/NameGenerator.swift`. The list and the rolls come from the old app.
-- Draft: `SuperSoccer2/Domain/LeagueDraft.swift`. A launch builds the twenty-club pool and tier draft, then the screen keeps Manchester City and Norwich City.
-- Season check, not a screen: `SuperSoccer2/Domain/SeasonHarness.swift`.
+- Draft: `SuperSoccer2/Domain/LeagueDraft.swift`. A launch builds the twenty-club pool and tier draft. Club selection still offers only Manchester City and Norwich City. The week uses every club and `seasonFixtures`.
+- Week: `MatchweekFeature` and `LeagueTable`. Points are 3 for a win and 1 for a draw. The table sorts by points, then goal difference, then `Club.overall`.
+- Season check, not a second screen: `SuperSoccer2/Domain/SeasonHarness.swift`.
 - Theme: `SuperSoccer2/Theme.swift`. Screens read `Theme` from the SwiftUI environment. A new look replaces `Theme.starbyte` in `AppView` (`SuperSoccer2/App/SuperSoccer2App.swift`). Do not put colors in a reducer.
 
 ## Ratings

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Seeded port of the previous league build: a rating pool, then a tier draft.
-/// Clubs stay in TeamFactory order. Index 0 drafts first. There is no league screen.
+/// Clubs stay in TeamFactory order. Index 0 drafts first. The week screen reads this league.
 enum LeagueDraft {
     static let clubCount = 20
     static let playersPerClub = 20
@@ -213,6 +213,15 @@ enum LeagueDraft {
             kit: template.kit,
             starters: roster.filter(\.isStarter)
         )
+    }
+
+    static let matchesPerWeek = clubCount / 2
+
+    static func weeks(in fixtures: [Fixture]) -> [[Fixture]] {
+        guard matchesPerWeek > 0 else { return [] }
+        return stride(from: 0, to: fixtures.count, by: matchesPerWeek).map { start in
+            Array(fixtures[start..<min(start + matchesPerWeek, fixtures.count)])
+        }
     }
 
     /// Nineteen circle-method weeks, then that list appended once. Even leagues have no bye.

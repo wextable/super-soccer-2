@@ -27,8 +27,8 @@ struct AppView: View {
             ClubSelectionView(store: store.scope(state: \.selection, action: \.selection))
         } destination: { store in
             switch store.case {
-            case let .matchday(store):
-                MatchdayView(store: store)
+            case let .matchweek(store):
+                MatchweekView(store: store)
             }
         }
         .tint(theme.colors.action.color)
