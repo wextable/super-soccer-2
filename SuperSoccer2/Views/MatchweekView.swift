@@ -57,7 +57,7 @@ struct MatchweekView: View {
         case .club:
             store.userClub?.name ?? "Club"
         case .table:
-            "Table"
+            "Week \(store.weekNumber)"
         case .week:
             "Week \(store.weekNumber)"
         case .match:

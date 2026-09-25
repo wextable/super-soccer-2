@@ -130,7 +130,10 @@ struct MatchweekFeatureTests {
         await store.send(.view(.kickOffButtonTapped))
         #expect(draws.withLock { $0 } == 1)
 
-        await store.send(.highlight(.presented(.view(.backButtonTapped))))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
         await store.skipReceivedActions()
         #expect(store.state.highlight == nil)
         #expect(store.state.currentWeekIsInTheTable)
@@ -140,7 +143,10 @@ struct MatchweekFeatureTests {
         let afterWeek = store.state.standings
         await store.send(.view(.replayButtonTapped))
         #expect(store.state.highlight != nil)
-        await store.send(.highlight(.presented(.view(.backButtonTapped))))
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.statsButtonTapped))))
+        await store.skipReceivedActions()
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
         await store.skipReceivedActions()
         #expect(store.state.standings == afterWeek)
         #expect(store.state.highlight == nil)
@@ -231,6 +237,26 @@ struct MatchweekFeatureTests {
             $0.player = nil
         }
         await store.send(.view(.playerTapped("missing")))
+    }
+
+    @Test func theTableUsesTheFullNameAndTheWeekUsesRankAndAShortName() throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let city = try #require(state.userClub)
+        let norwich = try #require(state.clubs.first { $0.id == "norwich-city" })
+        #expect(city.name == "Manchester City")
+        #expect(city.listName == "Man City")
+        #expect(city.shortName == "MCT")
+        #expect(norwich.name == "Norwich City")
+        #expect(norwich.listName == "Norwich")
+        #expect(norwich.shortName == "NWC")
+        #expect(state.clubs.allSatisfy { $0.listName != $0.shortName })
+        #expect(state.weekNumber == 1)
+        let cityPlace = try #require(state.places[city.id])
+        let norwichPlace = try #require(state.places[norwich.id])
+        #expect(state.fixtureNames[city.id] == "\(cityPlace) Man City")
+        #expect(state.fixtureNames[norwich.id] == "\(norwichPlace) Norwich")
+        #expect(cityPlace == 1)
     }
 
     @Test func theLastWeekDoesNotStartAnotherSeason() async {

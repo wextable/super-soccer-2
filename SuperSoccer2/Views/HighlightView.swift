@@ -38,10 +38,6 @@ struct HighlightView: View {
                     store.send(.view(.skipButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
-                Button("Back to the squad") {
-                    store.send(.view(.backButtonTapped))
-                }
-                .buttonStyle(ThemeActionButtonStyle())
             }
         }
         .padding(theme.space.lg)

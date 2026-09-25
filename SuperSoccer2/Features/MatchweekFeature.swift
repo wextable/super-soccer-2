@@ -139,6 +139,18 @@ struct MatchweekFeature {
             .map(\.element)
         }
 
+        var places: [String: Int] {
+            Dictionary(uniqueKeysWithValues: table.enumerated().map { ($1.clubID, $0 + 1) })
+        }
+
+        /// Week-list label: league place, then the short club name.
+        var fixtureNames: [String: String] {
+            Dictionary(uniqueKeysWithValues: clubs.map { club in
+                let name = places[club.id].map { "\($0) \(club.listName)" } ?? club.listName
+                return (club.id, name)
+            })
+        }
+
         fileprivate mutating func commitPendingWeek() {
             guard let pending, !currentWeekIsInTheTable else { return }
             standings = LeagueTable.applying(pending.scorelines, to: standings)

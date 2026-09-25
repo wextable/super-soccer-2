@@ -146,7 +146,7 @@ struct TableTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.sm) {
-                Text("Table")
+                Text("Week \(store.weekNumber)")
                     .font(theme.type.eyebrow)
                     .foregroundStyle(theme.colors.secondaryText.color)
                 WeekCard {
@@ -155,7 +155,7 @@ struct TableTab: View {
                         WeekHairline()
                         let club = store.clubs.first { $0.id == row.clubID }
                         tableRow(
-                            club: club?.shortName ?? row.clubID,
+                            club: club?.name ?? row.clubID,
                             played: "\(row.played)",
                             points: "\(row.points)",
                             difference: signedGoalDifference(row.goalDifference),
@@ -185,6 +185,8 @@ struct TableTab: View {
             Text(club)
                 .font(isHeader ? theme.type.eyebrow : theme.type.playerName)
                 .foregroundStyle(rowColor(emphasized: emphasized, isHeader: isHeader))
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(played)
                 .frame(width: theme.metrics.minimumControl, alignment: .trailing)
@@ -253,7 +255,7 @@ struct WeekTab: View {
         let away = store.clubs.first { $0.id == line.awayID }
         let isYours = line.homeID == store.userClubID || line.awayID == store.userClubID
         return HStack(spacing: theme.space.sm) {
-            Text(home?.shortName ?? line.homeID)
+            Text(store.fixtureNames[line.homeID] ?? line.homeID)
                 .font(theme.type.playerName)
                 .foregroundStyle(isYours ? theme.colors.action.color : theme.colors.text.color)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -272,7 +274,7 @@ struct WeekTab: View {
                     .font(theme.type.scoreSide)
                     .foregroundStyle(theme.colors.secondaryText.color)
             }
-            Text(away?.shortName ?? line.awayID)
+            Text(store.fixtureNames[line.awayID] ?? line.awayID)
                 .font(theme.type.playerName)
                 .foregroundStyle(isYours ? theme.colors.action.color : theme.colors.text.color)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -285,10 +287,12 @@ struct WeekTab: View {
     private func fixtureLabel(_ line: MatchweekFeature.State.WeekLine, home: Club?, away: Club?) -> String {
         let homeName = home?.name ?? line.homeID
         let awayName = away?.name ?? line.awayID
+        let homeBit = store.places[line.homeID].map { "\($0), \(homeName)" } ?? homeName
+        let awayBit = store.places[line.awayID].map { "\($0), \(awayName)" } ?? awayName
         if let homeScore = line.homeScore, let awayScore = line.awayScore {
-            return "\(homeName) \(homeScore), \(awayName) \(awayScore)"
+            return "\(homeBit) \(homeScore), \(awayBit) \(awayScore)"
         }
-        return "\(homeName) versus \(awayName)"
+        return "\(homeBit) versus \(awayBit)"
     }
 
     @ViewBuilder

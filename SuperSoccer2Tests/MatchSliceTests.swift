@@ -482,7 +482,16 @@ struct AppFeatureTests {
 
         await store.send(.path(.element(
             id: pathID,
-            action: .matchweek(.highlight(.presented(.view(.backButtonTapped))))
+            action: .matchweek(.highlight(.presented(.view(.skipButtonTapped))))
+        )))
+        await store.send(.path(.element(
+            id: pathID,
+            action: .matchweek(.highlight(.presented(.view(.statsButtonTapped))))
+        )))
+        await store.skipReceivedActions()
+        await store.send(.path(.element(
+            id: pathID,
+            action: .matchweek(.stats(.presented(.view(.backButtonTapped))))
         )))
         await store.skipReceivedActions()
         let returned = try #require(store.state.path[id: pathID, case: \.matchweek])
