@@ -23,6 +23,7 @@ struct MatchweekFeature {
         @Presents var leaders: LeadersFeature.State?
         @Presents var championship: ChampionshipFeature.State?
         @Presents var player: PlayerDetailFeature.State?
+        @Presents var seasonAlert: AlertState<Action.SeasonAlert>?
 
         enum Tab: Equatable, Hashable, Sendable, CaseIterable {
             case club
@@ -58,6 +59,7 @@ struct MatchweekFeature {
             leaders = nil
             championship = nil
             player = nil
+            seasonAlert = nil
         }
 
         var weekNumber: Int { weekIndex + 1 }
@@ -91,6 +93,26 @@ struct MatchweekFeature {
 
         var userIsHome: Bool {
             fixture?.homeID == userClubID
+        }
+
+        var playedHomeShort: String? {
+            guard currentWeekIsInTheTable else { return nil }
+            return pending?.home.shortName
+        }
+
+        var playedAwayShort: String? {
+            guard currentWeekIsInTheTable else { return nil }
+            return pending?.away.shortName
+        }
+
+        var playedHomeScore: Int? {
+            guard currentWeekIsInTheTable else { return nil }
+            return pending?.userMatch.homeScore
+        }
+
+        var playedAwayScore: Int? {
+            guard currentWeekIsInTheTable else { return nil }
+            return pending?.userMatch.awayScore
         }
 
         var opponent: Club? {
@@ -218,16 +240,24 @@ struct MatchweekFeature {
         case leaders(PresentationAction<LeadersFeature.Action>)
         case championship(PresentationAction<ChampionshipFeature.Action>)
         case player(PresentationAction<PlayerDetailFeature.Action>)
+        case seasonAlert(PresentationAction<SeasonAlert>)
 
         @CasePathable
         enum View {
             case kickOffButtonTapped
+            case simulateMatchButtonTapped
+            case simulateSeasonButtonTapped
             case replayButtonTapped
             case nextFixtureButtonTapped
             case tabSelected(State.Tab)
             case leadersButtonTapped
             case championshipButtonTapped
             case playerTapped(Player.ID)
+        }
+
+        @CasePathable
+        enum SeasonAlert: Equatable {
+            case confirm
         }
     }
 
@@ -238,32 +268,44 @@ struct MatchweekFeature {
             switch action {
             case .view(.kickOffButtonTapped):
                 guard !state.currentWeekIsInTheTable else { return .none }
-                if state.pending == nil {
-                    guard state.weeks.indices.contains(state.weekIndex) else {
-                        state.didFail = true
-                        return .none
+                guard ensurePending(&state), let pending = state.pending else { return .none }
+                state.stats = nil
+                state.highlight = HighlightFeature.State(
+                    match: pending.userMatch,
+                    home: pending.home,
+                    away: pending.away
+                )
+                return .none
+
+            case .view(.simulateMatchButtonTapped):
+                guard !state.currentWeekIsInTheTable else { return .none }
+                guard ensurePending(&state) else { return .none }
+                state.highlight = nil
+                state.stats = nil
+                state.commitPendingWeek()
+                return .none
+
+            case .view(.simulateSeasonButtonTapped):
+                guard !state.seasonIsOver else { return .none }
+                state.seasonAlert = AlertState {
+                    TextState("Simulate the rest of the season?")
+                } actions: {
+                    ButtonState(role: .cancel) {
+                        TextState("Cancel")
                     }
-                    let seed = Matchweek.weekSeed(draw: entropy.nextSeed(), weekIndex: state.weekIndex)
-                    guard let played = Matchweek.play(
-                        fixtures: state.weeks[state.weekIndex],
-                        clubs: state.clubs,
-                        userClubID: state.userClubID,
-                        seed: seed
-                    ) else {
-                        state.didFail = true
-                        return .none
+                    ButtonState(role: .destructive, action: .confirm) {
+                        TextState("Simulate")
                     }
-                    state.pending = played
-                    state.didFail = false
+                } message: {
+                    TextState("Every remaining week is played.")
                 }
-                if let pending = state.pending {
-                    state.stats = nil
-                    state.highlight = HighlightFeature.State(
-                        match: pending.userMatch,
-                        home: pending.home,
-                        away: pending.away
-                    )
-                }
+                return .none
+
+            case .seasonAlert(.presented(.confirm)):
+                simulateRemainingSeason(&state)
+                return .none
+
+            case .seasonAlert:
                 return .none
 
             case .view(.replayButtonTapped):
@@ -296,7 +338,8 @@ struct MatchweekFeature {
                 state.leaders = LeadersFeature.State(
                     goals: state.goalLeaders,
                     assists: state.assistLeaders,
-                    saves: state.saveLeaders
+                    saves: state.saveLeaders,
+                    userClubID: state.userClubID
                 )
                 return .none
 
@@ -361,6 +404,47 @@ struct MatchweekFeature {
         }
         .ifLet(\.$player, action: \.player) {
             PlayerDetailFeature()
+        }
+        .ifLet(\.$seasonAlert, action: \.seasonAlert)
+    }
+
+    private func ensurePending(_ state: inout State) -> Bool {
+        if state.pending != nil { return true }
+        guard state.weeks.indices.contains(state.weekIndex) else {
+            state.didFail = true
+            return false
+        }
+        let seed = Matchweek.weekSeed(draw: entropy.nextSeed(), weekIndex: state.weekIndex)
+        guard let played = Matchweek.play(
+            fixtures: state.weeks[state.weekIndex],
+            clubs: state.clubs,
+            userClubID: state.userClubID,
+            seed: seed
+        ) else {
+            state.didFail = true
+            return false
+        }
+        state.pending = played
+        state.didFail = false
+        return true
+    }
+
+    private func simulateRemainingSeason(_ state: inout State) {
+        state.highlight = nil
+        state.stats = nil
+        state.leaders = nil
+        state.championship = nil
+        state.player = nil
+        state.seasonAlert = nil
+        while !state.seasonIsOver {
+            if state.currentWeekIsInTheTable {
+                guard state.hasNextFixture else { return }
+                state.weekIndex += 1
+                state.pending = nil
+                state.didFail = false
+            }
+            guard ensurePending(&state) else { return }
+            state.commitPendingWeek()
         }
     }
 }

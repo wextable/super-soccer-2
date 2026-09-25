@@ -263,8 +263,12 @@ struct MatchweekFeatureTests {
         let rows = try #require(store.state.stats?.rows)
         #expect(store.state.highlight != nil)
         #expect(store.state.stats?.title == "Full time")
-        #expect(rows.map(\.minute) == shots.sorted { $0.minute < $1.minute }.map(\.minute))
-        #expect(rows.map(\.result) == shots.sorted { $0.minute < $1.minute }.map(\.result))
+        #expect(rows.map(\.minute) == listedShots(shots).map(\.minute))
+        #expect(rows.map(\.result) == listedShots(shots).map(\.result))
+        #expect(rows.map(\.name) == listedShots(shots).map { shot in
+            shot.result == .save ? shot.keeper.fullName : shot.shooter.fullName
+        })
+        #expect(rows.allSatisfy { $0.result != .miss })
         #expect(store.state.standings.allSatisfy { $0.played == 0 })
 
         await store.send(.stats(.presented(.view(.backButtonTapped))))
@@ -332,7 +336,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.assistLeaders.isEmpty)
         #expect(store.state.saveLeaders.isEmpty)
         await store.send(.view(.leadersButtonTapped)) {
-            $0.leaders = LeadersFeature.State(goals: [], assists: [], saves: [])
+            $0.leaders = LeadersFeature.State(goals: [], assists: [], saves: [], userClubID: "manchester-city")
         }
         #expect(store.state.leaders?.isEmpty == true)
         await store.send(.leaders(.dismiss)) {
@@ -483,6 +487,116 @@ struct MatchweekFeatureTests {
         await store.send(.view(.nextFixtureButtonTapped))
         #expect(store.state.weekIndex == state.weeks.count - 1)
     }
+
+    @Test func backToWeekFromFullTimeCommitsTheTable() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "norwich-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.kickOffButtonTapped))
+        let home = try #require(store.state.highlight?.finalHomeScore)
+        let away = try #require(store.state.highlight?.finalAwayScore)
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await store.send(.highlight(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.highlight == nil)
+        #expect(store.state.stats == nil)
+        #expect(store.state.currentWeekIsInTheTable)
+        #expect(store.state.playedHomeScore == home)
+        #expect(store.state.playedAwayScore == away)
+        #expect(store.state.tab == .match)
+        #expect(store.state.standings.allSatisfy { $0.played == 1 })
+    }
+
+    @Test func simulateMatchStaysOnTheMatchTabAndMatchesKickoff() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let simulated = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        simulated.exhaustivity = .off
+        #expect(simulated.state.playedHomeScore == nil)
+
+        await simulated.send(.view(.simulateMatchButtonTapped))
+        #expect(simulated.state.highlight == nil)
+        #expect(simulated.state.stats == nil)
+        #expect(simulated.state.tab == .match)
+        #expect(simulated.state.currentWeekIsInTheTable)
+        #expect(simulated.state.playedHomeScore != nil)
+        #expect(simulated.state.playedAwayScore != nil)
+        #expect(simulated.state.standings.allSatisfy { $0.played == 1 })
+        #expect(simulated.state.scorelines.count == 10)
+
+        await simulated.send(.view(.leadersButtonTapped))
+        #expect(simulated.state.leaders?.userClubID == "manchester-city")
+
+        let kicked = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        kicked.exhaustivity = .off
+        await kicked.send(.view(.kickOffButtonTapped))
+        await kicked.send(.highlight(.presented(.view(.skipButtonTapped))))
+        await kicked.send(.highlight(.presented(.view(.backButtonTapped))))
+        await kicked.skipReceivedActions()
+        #expect(kicked.state.standings == simulated.state.standings)
+        #expect(kicked.state.playedHomeScore == simulated.state.playedHomeScore)
+        #expect(kicked.state.playedAwayScore == simulated.state.playedAwayScore)
+        #expect(kicked.state.scorelines == simulated.state.scorelines)
+    }
+
+    @Test func simulateSeasonAsksThenFinishesTheRemainingWeeks() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 11 }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.simulateSeasonButtonTapped))
+        #expect(store.state.seasonAlert != nil)
+        #expect(store.state.seasonIsOver == false)
+        await store.send(.seasonAlert(.dismiss))
+        #expect(store.state.seasonAlert == nil)
+        #expect(store.state.record == nil)
+        #expect(store.state.weekIndex == 0)
+
+        await store.send(.view(.simulateMatchButtonTapped))
+        let afterOne = try #require(store.state.standings.first { $0.clubID == "manchester-city" })
+        #expect(afterOne.played == 1)
+
+        await store.send(.view(.simulateSeasonButtonTapped))
+        await store.send(.seasonAlert(.presented(.confirm)))
+        #expect(store.state.seasonAlert == nil)
+        #expect(store.state.seasonIsOver)
+        #expect(store.state.weekIndex == 37)
+        #expect(store.state.hasNextFixture == false)
+        #expect(store.state.highlight == nil)
+        #expect(store.state.stats == nil)
+        #expect(store.state.tab == .match)
+        #expect(store.state.standings.allSatisfy { $0.played == 38 })
+        #expect(store.state.record?.awards.map(\.kind) == AwardKind.allCases)
+        let afterSeason = try #require(store.state.standings.first { $0.clubID == "manchester-city" })
+        #expect(afterSeason.points >= afterOne.points)
+
+        let fresh = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 11 }
+        }
+        fresh.exhaustivity = .off
+        await fresh.send(.view(.simulateSeasonButtonTapped))
+        await fresh.send(.seasonAlert(.presented(.confirm)))
+        #expect(fresh.state.standings == store.state.standings)
+        #expect(fresh.state.record == store.state.record)
+    }
 }
 
 private func marking(
@@ -507,4 +621,16 @@ private func marking(
         }
         return copy
     }
+}
+
+private func listedShots(_ shots: [Shot]) -> [Shot] {
+    shots.enumerated()
+        .filter { $0.element.result != .miss }
+        .sorted { lhs, rhs in
+            if lhs.element.minute != rhs.element.minute {
+                return lhs.element.minute < rhs.element.minute
+            }
+            return lhs.offset < rhs.offset
+        }
+        .map(\.element)
 }

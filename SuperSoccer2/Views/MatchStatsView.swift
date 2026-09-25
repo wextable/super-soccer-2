@@ -11,9 +11,9 @@ struct MatchStatsView: View {
                 header
                 if store.rows.isEmpty {
                     ContentUnavailableView(
-                        "No shots",
+                        "No goals or saves",
                         systemImage: "soccerball",
-                        description: Text("The match produced none.")
+                        description: Text("Misses stay off this list.")
                     )
                     .frame(maxWidth: .infinity, minHeight: theme.metrics.emptyMinHeight)
                 } else {
@@ -78,7 +78,7 @@ struct MatchStatsView: View {
                 .font(theme.type.minute)
                 .foregroundStyle(theme.colors.secondaryText.color)
                 .frame(width: theme.metrics.minimumControl, alignment: .leading)
-            Text(row.shooter)
+            Text(row.name)
                 .font(theme.type.playerName)
                 .foregroundStyle(theme.colors.text.color)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,7 +88,7 @@ struct MatchStatsView: View {
         }
         .frame(minHeight: theme.metrics.minimumControl)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.minute) minutes, \(row.shooter), \(resultLabel(row))")
+        .accessibilityLabel("\(row.minute) minutes, \(row.name), \(resultLabel(row))")
     }
 
     private func resultLabel(_ row: MatchStatsFeature.State.Row) -> String {

@@ -78,10 +78,10 @@ struct LeadersView: View {
                 VStack(alignment: .leading, spacing: theme.space.xxs) {
                     Text(row.player.fullName)
                         .font(theme.type.playerName)
-                        .foregroundStyle(theme.colors.text.color)
-                    Text(row.clubName)
+                        .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.text.color)
+                    Text(isYours(row) ? "Your club · \(row.clubName)" : row.clubName)
                         .font(theme.type.captionNumber)
-                        .foregroundStyle(theme.colors.secondaryText.color)
+                        .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.secondaryText.color)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text("\(row.count)")
@@ -91,6 +91,15 @@ struct LeadersView: View {
             .frame(minHeight: theme.metrics.minimumControl)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(rank), \(row.player.fullName), \(row.clubName), \(row.count) \(title.lowercased())")
+        .accessibilityLabel(leaderLabel(row, title: title, rank: rank))
+    }
+
+    private func isYours(_ row: LeagueLeaders.Row) -> Bool {
+        row.clubID == store.userClubID
+    }
+
+    private func leaderLabel(_ row: LeagueLeaders.Row, title: String, rank: Int) -> String {
+        let club = isYours(row) ? "your club, \(row.clubName)" : row.clubName
+        return "\(rank), \(row.player.fullName), \(club), \(row.count) \(title.lowercased())"
     }
 }

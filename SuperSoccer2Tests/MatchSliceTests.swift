@@ -419,9 +419,26 @@ struct MatchStatsTests {
         #expect(state.title == "Full time")
         #expect(state.rows.map(\.minute) == [18, 44])
         #expect(state.rows.map(\.result) == [.goal, .goal])
-        #expect(state.rows.map(\.shooter) == ["Bo Scaramucci", "Queef Pistacio"])
+        #expect(state.rows.map(\.name) == ["Bo Scaramucci", "Queef Pistacio"])
         #expect(state.rows.map(\.isPenalty) == [true, false])
         #expect(state.homeGoals == 1)
+        #expect(state.awayGoals == 1)
+    }
+
+    @Test func missesStayOffTheListAndASaveNamesTheKeeper() {
+        let state = MatchStatsFeature.State(
+            shots: [
+                makeShot(id: 0, minute: 6, result: .miss, shooter: "Ada Striker", keeper: "Hank Keeper"),
+                makeShot(id: 1, minute: 12, result: .save, shooter: "Bo Scaramucci", keeper: "Udder Quartz"),
+                makeShot(id: 2, minute: 40, result: .goal, shooter: "Queef Pistacio", keeper: "Hank Keeper", isHome: false)
+            ],
+            homeShort: "MCI",
+            awayShort: "NOR"
+        )
+        #expect(state.rows.map(\.result) == [.save, .goal])
+        #expect(state.rows.map(\.name) == ["Udder Quartz", "Queef Pistacio"])
+        #expect(state.rows.allSatisfy { $0.result != .miss })
+        #expect(state.homeGoals == 0)
         #expect(state.awayGoals == 1)
     }
 }
