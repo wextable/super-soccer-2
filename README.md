@@ -1,6 +1,6 @@
 # SuperSoccer2
 
-An iPhone and iPad soccer management game. You take Manchester City or Norwich City, look at the generated squad, kick off, and watch one seeded highlight. The match is simulated. You do not control a player on the ball.
+An iPhone and iPad soccer management game. You take Manchester City or Norwich City. Each week you watch your fixture, and the other matches that week land on the table as scorelines. The match is simulated. You do not control a player on the ball.
 
 ## Open and run
 

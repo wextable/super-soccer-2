@@ -27,7 +27,7 @@ struct ClubSelectionView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
-            Text("Matchday one")
+            Text("The season")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.action.color)
             Text("Take a club")
@@ -116,7 +116,7 @@ struct ClubSelectionView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(club.name), \(club.nickname), overall \(club.overall), attack \(club.attack), defense \(club.defense), \(role(of: club))")
-        .accessibilityHint("Takes the job and opens the squad")
+        .accessibilityHint("Takes the job and opens the week")
     }
 
     private func role(of club: Club) -> String {
