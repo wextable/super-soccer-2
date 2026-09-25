@@ -28,6 +28,14 @@ struct HighlightView: View {
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
+            if store.phase != .fullTime {
+                Button {
+                    store.send(.view(.skipButtonTapped))
+                } label: {
+                    Text("Skip")
+                }
+                .buttonStyle(ThemeActionButtonStyle())
+            }
             Button {
                 store.send(.view(.backButtonTapped))
             } label: {

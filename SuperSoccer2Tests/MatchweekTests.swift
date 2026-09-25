@@ -152,6 +152,36 @@ struct MatchweekFeatureTests {
         #expect(store.state.standings == afterWeek)
     }
 
+    @Test func skipEndsTheReelAndBackStillUpdatesTheTable() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "norwich-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.kickOffButtonTapped))
+        let finalHome = try #require(store.state.highlight?.finalHomeScore)
+        let finalAway = try #require(store.state.highlight?.finalAwayScore)
+        #expect(store.state.standings.allSatisfy { $0.played == 0 })
+
+        await store.send(.highlight(.presented(.view(.skipButtonTapped))))
+        #expect(store.state.highlight?.phase == .fullTime)
+        #expect(store.state.highlight?.commentary == "Full time.")
+        #expect(store.state.highlight?.homeScore == finalHome)
+        #expect(store.state.highlight?.awayScore == finalAway)
+        #expect(store.state.highlight != nil)
+        #expect(store.state.standings.allSatisfy { $0.played == 0 })
+
+        await store.send(.highlight(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.highlight == nil)
+        #expect(store.state.currentWeekIsInTheTable)
+        #expect(store.state.standings.allSatisfy { $0.played == 1 })
+        #expect(store.state.scorelines.count == 10)
+    }
+
     @Test func theLastWeekDoesNotStartAnotherSeason() async {
         let season = LeagueDraft.makeLeague(seed: 1)
         var state = MatchweekFeature.State(userClubID: "norwich-city", season: season)

@@ -349,6 +349,36 @@ struct HighlightFeatureTests {
         }
     }
 
+    @Test func skipLandsOnTheSameFullTimeStateAndCancelsTheBeat() async {
+        let clock = TestClock()
+        let store = TestStore(initialState: HighlightFeature.State(match: reelMatch(), home: sampleHome(), away: sampleAway())) {
+            HighlightFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+        }
+
+        await store.send(.view(.onAppear(reduceMotion: false))) {
+            $0.hasAppeared = true
+        }
+        await store.send(.view(.skipButtonTapped)) {
+            $0.index = 2
+            $0.minute = 44
+            $0.phase = .fullTime
+            $0.commentary = "Full time."
+            $0.result = .goal
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.homeScore = 1
+            $0.awayScore = 1
+        }
+        #expect(store.state.homeScore == store.state.finalHomeScore)
+        #expect(store.state.awayScore == store.state.finalAwayScore)
+        #expect(store.state.showsPasser == false)
+
+        await store.send(.view(.skipButtonTapped))
+        await clock.advance(by: HighlightFeature.lineDuration + HighlightFeature.beatDuration)
+    }
+
     @Test func leavingCancelsTheBeat() async {
         let clock = TestClock()
         let store = TestStore(initialState: HighlightFeature.State(match: sampleMatch(), home: sampleHome(), away: sampleAway())) {
