@@ -11,6 +11,7 @@ struct ChampionshipFeature {
         var goals: [LeagueLeaders.Row]
         var assists: [LeagueLeaders.Row]
         var saves: [LeagueLeaders.Row]
+        var userClubID: String
         @Presents var player: PlayerDetailFeature.State?
 
         var championName: String { record.championName }
@@ -32,14 +33,14 @@ struct ChampionshipFeature {
             switch action {
             case let .view(.awardTapped(kind)):
                 guard let award = state.record.awards.first(where: { $0.kind == kind }) else { return .none }
-                state.player = PlayerDetailFeature.State(player: award.player)
+                state.player = PlayerDetailFeature.State(player: award.player, clubName: award.clubName)
                 return .none
             case let .view(.leaderTapped(id)):
                 let row = state.goals.first { $0.player.id == id }
                     ?? state.assists.first { $0.player.id == id }
                     ?? state.saves.first { $0.player.id == id }
                 guard let row else { return .none }
-                state.player = PlayerDetailFeature.State(player: row.player)
+                state.player = PlayerDetailFeature.State(player: row.player, clubName: row.clubName)
                 return .none
             case .player:
                 return .none

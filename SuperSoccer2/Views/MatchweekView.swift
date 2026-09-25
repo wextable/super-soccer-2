@@ -40,6 +40,11 @@ struct MatchweekView: View {
             ChampionshipView(store: championshipStore)
         }
         .navigationDestination(
+            item: $store.scope(state: \.team, action: \.team)
+        ) { teamStore in
+            TeamView(store: teamStore)
+        }
+        .navigationDestination(
             item: $store.scope(state: \.player, action: \.player)
         ) { playerStore in
             PlayerDetailView(store: playerStore)

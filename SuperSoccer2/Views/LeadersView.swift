@@ -24,9 +24,15 @@ struct LeadersView: View {
                     )
                     .frame(maxWidth: .infinity, minHeight: theme.metrics.emptyMinHeight)
                 } else {
-                    board("Goals", rows: store.goals)
-                    board("Assists", rows: store.assists)
-                    board("Saves", rows: store.saves)
+                    board("Goals", rows: store.listedGoals, canExpand: store.goalsCanExpand, total: store.goals.count) {
+                        store.send(.view(.expandGoalsTapped))
+                    }
+                    board("Assists", rows: store.listedAssists, canExpand: store.assistsCanExpand, total: store.assists.count) {
+                        store.send(.view(.expandAssistsTapped))
+                    }
+                    board("Saves", rows: store.listedSaves, canExpand: store.savesCanExpand, total: store.saves.count) {
+                        store.send(.view(.expandSavesTapped))
+                    }
                 }
             }
             .padding(theme.space.lg)
@@ -42,7 +48,13 @@ struct LeadersView: View {
         }
     }
 
-    private func board(_ title: String, rows: [LeagueLeaders.Row]) -> some View {
+    private func board(
+        _ title: String,
+        rows: [LeagueLeaders.Row],
+        canExpand: Bool,
+        total: Int,
+        expand: @escaping () -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
             Text(title)
                 .font(theme.type.eyebrow)
@@ -61,6 +73,15 @@ struct LeadersView: View {
                             WeekHairline()
                         }
                     }
+                }
+                if canExpand {
+                    Button("Show all \(total)") {
+                        expand()
+                    }
+                    .buttonStyle(.plain)
+                    .font(theme.type.button)
+                    .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl)
+                    .foregroundStyle(theme.colors.action.color)
                 }
             }
         }

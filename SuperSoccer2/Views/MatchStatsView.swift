@@ -78,17 +78,31 @@ struct MatchStatsView: View {
                 .font(theme.type.minute)
                 .foregroundStyle(theme.colors.secondaryText.color)
                 .frame(width: theme.metrics.minimumControl, alignment: .leading)
-            Text(row.name)
-                .font(theme.type.playerName)
-                .foregroundStyle(theme.colors.text.color)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: theme.space.xxs) {
+                Text(row.name)
+                    .font(theme.type.playerName)
+                    .foregroundStyle(theme.colors.text.color)
+                if let assist = row.assist {
+                    Text(assist)
+                        .font(theme.type.captionNumber)
+                        .foregroundStyle(theme.colors.secondaryText.color)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(resultLabel(row))
                 .font(theme.type.overall)
                 .foregroundStyle(row.result == .goal ? theme.colors.score.color : theme.colors.secondaryText.color)
         }
         .frame(minHeight: theme.metrics.minimumControl)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.minute) minutes, \(row.name), \(resultLabel(row))")
+        .accessibilityLabel(shotLabel(row))
+    }
+
+    private func shotLabel(_ row: MatchStatsFeature.State.Row) -> String {
+        if let assist = row.assist {
+            return "\(row.minute) minutes, \(row.name), assist \(assist), \(resultLabel(row))"
+        }
+        return "\(row.minute) minutes, \(row.name), \(resultLabel(row))"
     }
 
     private func resultLabel(_ row: MatchStatsFeature.State.Row) -> String {
