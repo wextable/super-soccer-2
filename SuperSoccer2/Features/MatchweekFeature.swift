@@ -13,7 +13,26 @@ struct MatchweekFeature {
         var committedWeeks: Int
         var pending: Matchweek.Played?
         var didFail: Bool
+        var tab: Tab
         @Presents var highlight: HighlightFeature.State?
+        @Presents var stats: MatchStatsFeature.State?
+        @Presents var player: PlayerDetailFeature.State?
+
+        enum Tab: Equatable, Hashable, Sendable, CaseIterable {
+            case club
+            case table
+            case week
+            case match
+        }
+
+        struct WeekLine: Equatable, Identifiable, Sendable {
+            var homeID: String
+            var awayID: String
+            var homeScore: Int?
+            var awayScore: Int?
+
+            var id: String { "\(homeID)-\(awayID)" }
+        }
 
         init(userClubID: String, season: LeagueDraft.Season) {
             self.userClubID = userClubID
@@ -24,6 +43,10 @@ struct MatchweekFeature {
             committedWeeks = 0
             pending = nil
             didFail = false
+            tab = .match
+            highlight = nil
+            stats = nil
+            player = nil
         }
 
         var weekNumber: Int { weekIndex + 1 }
@@ -46,6 +69,10 @@ struct MatchweekFeature {
             clubs.first { $0.id == userClubID }
         }
 
+        var userStanding: Standing? {
+            standings.first { $0.clubID == userClubID }
+        }
+
         var fixture: LeagueDraft.Fixture? {
             guard weeks.indices.contains(weekIndex) else { return nil }
             return weeks[weekIndex].first { $0.homeID == userClubID || $0.awayID == userClubID }
@@ -61,6 +88,46 @@ struct MatchweekFeature {
             return clubs.first { $0.id == opponentID }
         }
 
+        /// Highest overalls on the next opponent. A tie keeps roster order.
+        var keyPlayers: [Player] {
+            guard let opponent else { return [] }
+            return opponent.starters
+                .enumerated()
+                .sorted { lhs, rhs in
+                    if lhs.element.overall != rhs.element.overall {
+                        return lhs.element.overall > rhs.element.overall
+                    }
+                    return lhs.offset < rhs.offset
+                }
+                .prefix(3)
+                .map(\.element)
+        }
+
+        var weekLines: [WeekLine] {
+            guard weeks.indices.contains(weekIndex) else { return [] }
+            let played = currentWeekIsInTheTable ? pending?.scorelines ?? [] : []
+            let scores = Dictionary(uniqueKeysWithValues: played.map { ("\($0.homeID)-\($0.awayID)", $0) })
+            return weeks[weekIndex].enumerated().map { offset, fixture in
+                let score = scores["\(fixture.homeID)-\(fixture.awayID)"]
+                return (
+                    offset,
+                    WeekLine(
+                        homeID: fixture.homeID,
+                        awayID: fixture.awayID,
+                        homeScore: score?.homeScore,
+                        awayScore: score?.awayScore
+                    )
+                )
+            }
+            .sorted { lhs, rhs in
+                let leftIsUser = lhs.1.homeID == userClubID || lhs.1.awayID == userClubID
+                let rightIsUser = rhs.1.homeID == userClubID || rhs.1.awayID == userClubID
+                if leftIsUser != rightIsUser { return leftIsUser }
+                return lhs.0 < rhs.0
+            }
+            .map(\.1)
+        }
+
         var scorelines: [Matchweek.Scoreline] {
             guard currentWeekIsInTheTable, let lines = pending?.scorelines else { return [] }
             return lines.enumerated().sorted { lhs, rhs in
@@ -71,17 +138,27 @@ struct MatchweekFeature {
             }
             .map(\.element)
         }
+
+        fileprivate mutating func commitPendingWeek() {
+            guard let pending, !currentWeekIsInTheTable else { return }
+            standings = LeagueTable.applying(pending.scorelines, to: standings)
+            committedWeeks = weekIndex + 1
+        }
     }
 
     enum Action {
         case view(View)
         case highlight(PresentationAction<HighlightFeature.Action>)
+        case stats(PresentationAction<MatchStatsFeature.Action>)
+        case player(PresentationAction<PlayerDetailFeature.Action>)
 
         @CasePathable
         enum View {
             case kickOffButtonTapped
             case replayButtonTapped
             case nextFixtureButtonTapped
+            case tabSelected(State.Tab)
+            case playerTapped(Player.ID)
         }
     }
 
@@ -111,6 +188,7 @@ struct MatchweekFeature {
                     state.didFail = false
                 }
                 if let pending = state.pending {
+                    state.stats = nil
                     state.highlight = HighlightFeature.State(
                         match: pending.userMatch,
                         home: pending.home,
@@ -121,6 +199,7 @@ struct MatchweekFeature {
 
             case .view(.replayButtonTapped):
                 guard let pending = state.pending, state.currentWeekIsInTheTable else { return .none }
+                state.stats = nil
                 state.highlight = HighlightFeature.State(
                     match: pending.userMatch,
                     home: pending.home,
@@ -133,22 +212,56 @@ struct MatchweekFeature {
                 state.weekIndex += 1
                 state.pending = nil
                 state.highlight = nil
+                state.stats = nil
+                state.player = nil
                 state.didFail = false
+                return .none
+
+            case let .view(.tabSelected(tab)):
+                state.tab = tab
+                return .none
+
+            case let .view(.playerTapped(id)):
+                guard let player = state.userClub?.starters.first(where: { $0.id == id }) else { return .none }
+                state.player = PlayerDetailFeature.State(player: player)
                 return .none
 
             case .highlight(.presented(.delegate(.dismissed))):
                 state.highlight = nil
-                guard let pending = state.pending, !state.currentWeekIsInTheTable else { return .none }
-                state.standings = LeagueTable.applying(pending.scorelines, to: state.standings)
-                state.committedWeeks = state.weekIndex + 1
+                state.stats = nil
+                state.commitPendingWeek()
+                return .none
+
+            case .highlight(.presented(.delegate(.showStats))):
+                guard state.highlight?.phase == .fullTime, let pending = state.pending else { return .none }
+                state.stats = MatchStatsFeature.State(
+                    shots: pending.userMatch.shots,
+                    homeShort: pending.home.shortName,
+                    awayShort: pending.away.shortName
+                )
                 return .none
 
             case .highlight:
+                return .none
+
+            case .stats(.presented(.delegate(.dismissed))):
+                state.highlight = nil
+                state.stats = nil
+                state.commitPendingWeek()
+                return .none
+
+            case .stats, .player:
                 return .none
             }
         }
         .ifLet(\.$highlight, action: \.highlight) {
             HighlightFeature()
+        }
+        .ifLet(\.$stats, action: \.stats) {
+            MatchStatsFeature()
+        }
+        .ifLet(\.$player, action: \.player) {
+            PlayerDetailFeature()
         }
     }
 }

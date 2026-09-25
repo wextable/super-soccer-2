@@ -360,6 +360,7 @@ struct HighlightFeatureTests {
         await store.send(.view(.onAppear(reduceMotion: false))) {
             $0.hasAppeared = true
         }
+        await store.send(.view(.statsButtonTapped))
         await store.send(.view(.skipButtonTapped)) {
             $0.index = 2
             $0.minute = 44
@@ -377,6 +378,8 @@ struct HighlightFeatureTests {
 
         await store.send(.view(.skipButtonTapped))
         await clock.advance(by: HighlightFeature.lineDuration + HighlightFeature.beatDuration)
+        await store.send(.view(.statsButtonTapped))
+        await store.receive(\.delegate.showStats)
     }
 
     @Test func leavingCancelsTheBeat() async {
@@ -399,6 +402,27 @@ struct HighlightFeatureTests {
         }
         await store.send(.view(.backButtonTapped))
         await store.receive(\.delegate.dismissed)
+    }
+}
+
+@Suite
+struct MatchStatsTests {
+    @Test func statsListTheShotsInMinuteOrder() {
+        let state = MatchStatsFeature.State(
+            shots: [
+                makeShot(id: 2, minute: 44, result: .goal, shooter: "Queef Pistacio", isHome: false),
+                makeShot(id: 1, minute: 18, result: .goal, type: .penalty, shooter: "Bo Scaramucci")
+            ],
+            homeShort: "MCI",
+            awayShort: "NOR"
+        )
+        #expect(state.title == "Full time")
+        #expect(state.rows.map(\.minute) == [18, 44])
+        #expect(state.rows.map(\.result) == [.goal, .goal])
+        #expect(state.rows.map(\.shooter) == ["Bo Scaramucci", "Queef Pistacio"])
+        #expect(state.rows.map(\.isPenalty) == [true, false])
+        #expect(state.homeGoals == 1)
+        #expect(state.awayGoals == 1)
     }
 }
 

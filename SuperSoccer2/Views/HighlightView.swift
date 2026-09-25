@@ -28,20 +28,21 @@ struct HighlightView: View {
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
-            if store.phase != .fullTime {
-                Button {
+            if store.phase == .fullTime {
+                Button("Full-time stats") {
+                    store.send(.view(.statsButtonTapped))
+                }
+                .buttonStyle(ThemeActionButtonStyle())
+            } else {
+                Button("Skip") {
                     store.send(.view(.skipButtonTapped))
-                } label: {
-                    Text("Skip")
+                }
+                .buttonStyle(ThemeActionButtonStyle())
+                Button("Back to the squad") {
+                    store.send(.view(.backButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
-            Button {
-                store.send(.view(.backButtonTapped))
-            } label: {
-                Text("Back to the squad")
-            }
-            .buttonStyle(ThemeActionButtonStyle())
         }
         .padding(theme.space.lg)
         .readingWidth()

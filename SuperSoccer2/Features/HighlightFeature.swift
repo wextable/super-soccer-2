@@ -184,12 +184,14 @@ struct HighlightFeature {
             case onAppear(reduceMotion: Bool)
             case advance
             case skipButtonTapped
+            case statsButtonTapped
             case backButtonTapped
         }
 
         @CasePathable
         enum Delegate {
             case dismissed
+            case showStats
         }
     }
 
@@ -237,6 +239,13 @@ struct HighlightFeature {
                 guard state.phase != .fullTime else { return .none }
                 state.finishReel()
                 return .cancel(id: CancelID.beat)
+
+            case .view(.statsButtonTapped):
+                guard state.phase == .fullTime else { return .none }
+                return .merge(
+                    .cancel(id: CancelID.beat),
+                    .send(.delegate(.showStats))
+                )
 
             case .view(.backButtonTapped):
                 return .merge(
