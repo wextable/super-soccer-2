@@ -215,20 +215,84 @@ struct CommentaryTests {
 @Suite
 @MainActor
 struct HighlightFeatureTests {
-    @Test func beatRevealsTheSentenceOnTheClock() async {
+    @Test func reelPlaysEachShotOnTheClockThenFullTime() async {
         let clock = TestClock()
-        let store = TestStore(initialState: HighlightFeature.State(match: sampleMatch(), home: sampleHome(), away: sampleAway())) {
+        let store = TestStore(initialState: HighlightFeature.State(match: reelMatch(), home: sampleHome(), away: sampleAway())) {
             HighlightFeature()
         } withDependencies: {
             $0.continuousClock = clock
         }
 
-        await store.send(.view(.onAppear(reduceMotion: false)))
+        #expect(store.state.shots.map(\.minute) == [6, 18, 44])
+        #expect(store.state.phase == .incoming)
+        #expect(store.state.minute == 6)
+        #expect(store.state.homeScore == 0)
+        #expect(store.state.awayScore == 0)
+        #expect(store.state.sentenceVisible == false)
+        #expect(store.state.commentary == "Ada Striker of Norwich City shoots. Hank Keeper saves for Manchester City.")
+
+        await store.send(.view(.onAppear(reduceMotion: false))) {
+            $0.hasAppeared = true
+        }
+
         await clock.advance(by: HighlightFeature.beatDuration)
         await store.receive(\.view.advance) {
+            $0.phase = .shown
             $0.ballProgress = 1
             $0.sentenceVisible = true
         }
+
+        await clock.advance(by: HighlightFeature.lineDuration)
+        await store.receive(\.view.advance) {
+            $0.index = 1
+            $0.phase = .incoming
+            $0.minute = 18
+            $0.commentary = "Penalty. Bo Scaramucci of Manchester City scores."
+            $0.attackingIsHome = true
+            $0.result = .goal
+            $0.ballProgress = 0
+            $0.sentenceVisible = false
+        }
+
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.homeScore = 1
+        }
+
+        await clock.advance(by: HighlightFeature.lineDuration)
+        await store.receive(\.view.advance) {
+            $0.index = 2
+            $0.phase = .incoming
+            $0.minute = 44
+            $0.commentary = "Queef Pistacio of Norwich City scores from Chode Magnusson."
+            $0.attackingIsHome = false
+            $0.showsPasser = true
+            $0.ballProgress = 0
+            $0.sentenceVisible = false
+        }
+
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.awayScore = 1
+        }
+
+        await clock.advance(by: HighlightFeature.lineDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .fullTime
+            $0.commentary = "Full time."
+            $0.showsPasser = false
+        }
+
+        #expect(store.state.homeScore == 1)
+        #expect(store.state.awayScore == 1)
+        #expect(store.state.homeScore == store.state.finalHomeScore)
+        #expect(store.state.awayScore == store.state.finalAwayScore)
     }
 
     @Test func reduceMotionShowsTheLineImmediately() async {
@@ -237,8 +301,51 @@ struct HighlightFeatureTests {
         }
 
         await store.send(.view(.onAppear(reduceMotion: true))) {
+            $0.hasAppeared = true
+            $0.reduceMotion = true
+            $0.phase = .shown
             $0.ballProgress = 1
             $0.sentenceVisible = true
+            $0.homeScore = 1
+        }
+        #expect(store.state.commentary == "Bo Scaramucci of Manchester City scores from Chode Magnusson.")
+    }
+
+    @Test func reduceMotionStepsToFullTimeWithoutAClock() async {
+        let store = TestStore(initialState: HighlightFeature.State(match: reelMatch(), home: sampleHome(), away: sampleAway())) {
+            HighlightFeature()
+        }
+
+        await store.send(.view(.onAppear(reduceMotion: true))) {
+            $0.hasAppeared = true
+            $0.reduceMotion = true
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+        }
+
+        await store.send(.view(.advance)) {
+            $0.index = 1
+            $0.minute = 18
+            $0.commentary = "Penalty. Bo Scaramucci of Manchester City scores."
+            $0.attackingIsHome = true
+            $0.result = .goal
+            $0.homeScore = 1
+        }
+
+        await store.send(.view(.advance)) {
+            $0.index = 2
+            $0.minute = 44
+            $0.commentary = "Queef Pistacio of Norwich City scores from Chode Magnusson."
+            $0.attackingIsHome = false
+            $0.showsPasser = true
+            $0.awayScore = 1
+        }
+
+        await store.send(.view(.advance)) {
+            $0.phase = .fullTime
+            $0.commentary = "Full time."
+            $0.showsPasser = false
         }
     }
 
@@ -250,7 +357,16 @@ struct HighlightFeatureTests {
             $0.continuousClock = clock
         }
 
-        await store.send(.view(.onAppear(reduceMotion: false)))
+        await store.send(.view(.onAppear(reduceMotion: false))) {
+            $0.hasAppeared = true
+        }
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.homeScore = 1
+        }
         await store.send(.view(.backButtonTapped))
         await store.receive(\.delegate.dismissed)
     }
@@ -259,7 +375,7 @@ struct HighlightFeatureTests {
 @Suite
 @MainActor
 struct AppFeatureTests {
-    @Test func pickKickoffAndReturnKeepsTheScore() async {
+    @Test func pickKickoffAndReturnKeepsTheScore() async throws {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
         } withDependencies: {
@@ -281,11 +397,24 @@ struct AppFeatureTests {
         #expect(matchday?.opponent.name == "Manchester City")
 
         await store.send(.path(.element(id: pathID, action: .matchday(.view(.kickOffButtonTapped)))))
-        let played = store.state.path[id: pathID, case: \.matchday]
-        #expect(played?.result != nil)
-        #expect(played?.highlight?.commentary == played?.result?.commentary)
-        #expect(played?.highlight?.sentenceVisible == false)
-        #expect(played?.result?.commentary.contains("of ") == true)
+        let played = try #require(store.state.path[id: pathID, case: \.matchday])
+        let shot = try #require(played.result?.shots.first)
+        #expect(played.highlight?.sentenceVisible == false)
+        #expect(played.highlight?.phase == .incoming)
+        #expect(played.highlight?.homeScore == 0)
+        #expect(played.highlight?.awayScore == 0)
+        #expect(played.highlight?.finalHomeScore == played.result?.homeScore)
+        #expect(played.highlight?.finalAwayScore == played.result?.awayScore)
+        #expect(played.highlight?.shots.map(\.id) == played.result?.shots.map(\.id))
+        #expect(played.highlight?.minute == shot.minute)
+        #expect(
+            played.highlight?.commentary == Commentary.line(
+                shot: shot,
+                attackingClub: shot.isHome ? played.userClub.name : played.opponent.name,
+                defendingClub: shot.isHome ? played.opponent.name : played.userClub.name
+            )
+        )
+        #expect(played.result?.commentary.contains("of ") == true)
 
         await store.send(.path(.element(
             id: pathID,
@@ -294,7 +423,7 @@ struct AppFeatureTests {
         await store.skipReceivedActions()
         let returned = store.state.path[id: pathID, case: \.matchday]
         #expect(returned?.highlight == nil)
-        #expect(returned?.result == played?.result)
+        #expect(returned?.result == played.result)
     }
 }
 
@@ -332,7 +461,8 @@ private func makeShot(
     type: ShotType = .regular,
     shooter: String = "Bo Queef",
     passer: String? = nil,
-    keeper: String = "Hank Keeper"
+    keeper: String = "Hank Keeper",
+    isHome: Bool = true
 ) -> Shot {
     Shot(
         id: id,
@@ -342,7 +472,7 @@ private func makeShot(
         passer: passer.map { named($0, id: "passer", position: .midfielder) },
         keeper: named(keeper, id: "keeper", position: .keeper),
         minute: minute,
-        isHome: true
+        isHome: isHome
     )
 }
 
@@ -357,11 +487,46 @@ private func sampleAway() -> Club {
 private func sampleMatch() -> MatchResult {
     let shot = makeShot(result: .goal, shooter: "Bo Scaramucci", passer: "Chode Magnusson")
     return MatchResult(
-        homeScore: 2,
+        homeScore: 1,
         awayScore: 0,
         shots: [shot],
         highlight: shot,
         commentary: Commentary.line(shot: shot, attackingClub: "Manchester City", defendingClub: "Norwich City"),
         seed: 1
+    )
+}
+
+private func reelMatch() -> MatchResult {
+    let later = makeShot(
+        id: 2,
+        minute: 44,
+        result: .goal,
+        shooter: "Queef Pistacio",
+        passer: "Chode Magnusson",
+        isHome: false
+    )
+    let opener = makeShot(
+        id: 0,
+        minute: 6,
+        result: .save,
+        shooter: "Ada Striker",
+        keeper: "Hank Keeper",
+        isHome: false
+    )
+    let penalty = makeShot(
+        id: 1,
+        minute: 18,
+        result: .goal,
+        type: .penalty,
+        shooter: "Bo Scaramucci",
+        isHome: true
+    )
+    return MatchResult(
+        homeScore: 1,
+        awayScore: 1,
+        shots: [later, opener, penalty],
+        highlight: penalty,
+        commentary: "unused",
+        seed: 7
     )
 }

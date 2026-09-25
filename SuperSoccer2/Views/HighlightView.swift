@@ -14,11 +14,19 @@ struct HighlightView: View {
                     progress: store.ballProgress,
                     attacking: attackingColor,
                     defending: defendingColor,
-                    showsPasser: store.showsPasser,
+                    showsPasser: store.showsPasser && store.phase != .fullTime,
                     result: store.result
                 )
                 ticker
                     .padding(theme.space.sm)
+            }
+            if store.reduceMotion, store.phase != .fullTime {
+                Button {
+                    store.send(.view(.advance))
+                } label: {
+                    Text(nextTitle)
+                }
+                .buttonStyle(ThemeActionButtonStyle())
             }
             Button {
                 store.send(.view(.backButtonTapped))
@@ -33,7 +41,19 @@ struct HighlightView: View {
         .onAppear {
             store.send(.view(.onAppear(reduceMotion: reduceMotion)))
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.8), value: store.ballProgress)
+        .animation(ballAnimation, value: store.ballProgress)
+    }
+
+    private var ballAnimation: Animation? {
+        guard store.sentenceVisible, !reduceMotion else { return nil }
+        return .easeInOut(duration: 0.8)
+    }
+
+    private var nextTitle: String {
+        if store.phase == .shown, store.index + 1 >= store.shots.count {
+            return "Full time"
+        }
+        return "Next shot"
     }
 
     private var scoreboard: some View {
@@ -54,13 +74,25 @@ struct HighlightView: View {
             Text(store.awayShort)
                 .font(theme.type.scoreSide)
             Spacer()
-            Text("\(store.minute)'")
+            Text(store.minuteText)
                 .font(theme.type.minute)
                 .foregroundStyle(theme.colors.secondaryText.color)
         }
         .foregroundStyle(theme.colors.text.color)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Full time \(store.homeShort) \(store.homeScore), \(store.awayShort) \(store.awayScore), minute \(store.minute)")
+        .accessibilityLabel(scoreLabel)
+    }
+
+    private var scoreLabel: String {
+        let score = "\(store.homeShort) \(store.homeScore), \(store.awayShort) \(store.awayScore)"
+        switch store.phase {
+        case .incoming:
+            return "\(store.minute) minutes, \(score), before the shot"
+        case .shown:
+            return "\(store.minute) minutes, \(score)"
+        case .fullTime:
+            return "Full time, \(score)"
+        }
     }
 
     private var ticker: some View {
@@ -72,6 +104,7 @@ struct HighlightView: View {
             .background(theme.colors.tickerBackground.color)
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
             .accessibilityLabel(store.commentary)
+            .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
     }
 
     private var attackingColor: Color {
