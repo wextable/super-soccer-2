@@ -145,10 +145,14 @@ struct TableTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: theme.space.sm) {
+            VStack(alignment: .leading, spacing: theme.space.lg) {
                 Text("Week \(store.weekNumber)")
                     .font(theme.type.eyebrow)
                     .foregroundStyle(theme.colors.secondaryText.color)
+                Button("Leaders") {
+                    store.send(.view(.leadersButtonTapped))
+                }
+                .buttonStyle(ThemeActionButtonStyle())
                 WeekCard {
                     tableRow(club: "Club", played: "P", points: "Pts", difference: "GD", emphasized: false, isHeader: true)
                     ForEach(store.table) { row in
@@ -403,21 +407,25 @@ struct MatchTab: View {
                 .foregroundStyle(theme.colors.secondaryText.color)
             WeekCard {
                 ForEach(store.keyPlayers) { player in
-                    HStack(spacing: theme.space.sm) {
-                        Text(player.position.label)
-                            .font(theme.type.captionNumber)
-                            .foregroundStyle(theme.colors.secondaryText.color)
-                            .frame(width: theme.metrics.minimumControl, alignment: .leading)
-                        Text(player.fullName)
-                            .font(theme.type.playerName)
-                            .foregroundStyle(theme.colors.text.color)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("\(player.overall)")
-                            .font(theme.type.playerOverall)
-                            .foregroundStyle(theme.colors.text.color)
+                    Button {
+                        store.send(.view(.playerTapped(player.id)))
+                    } label: {
+                        HStack(spacing: theme.space.sm) {
+                            Text(player.position.label)
+                                .font(theme.type.captionNumber)
+                                .foregroundStyle(theme.colors.secondaryText.color)
+                                .frame(width: theme.metrics.minimumControl, alignment: .leading)
+                            Text(player.fullName)
+                                .font(theme.type.playerName)
+                                .foregroundStyle(theme.colors.text.color)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text("\(player.overall)")
+                                .font(theme.type.playerOverall)
+                                .foregroundStyle(theme.colors.text.color)
+                        }
+                        .frame(minHeight: theme.metrics.minimumControl)
                     }
-                    .frame(minHeight: theme.metrics.minimumControl)
-                    .accessibilityElement(children: .ignore)
+                    .buttonStyle(.plain)
                     .accessibilityLabel("\(player.fullName), \(player.position.label), overall \(player.overall)")
                     if player.id != store.keyPlayers.last?.id {
                         WeekHairline()

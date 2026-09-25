@@ -30,6 +30,11 @@ struct MatchweekView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.weekIndex)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.currentWeekIsInTheTable)
         .navigationDestination(
+            item: $store.scope(state: \.leaders, action: \.leaders)
+        ) { leadersStore in
+            LeadersView(store: leadersStore)
+        }
+        .navigationDestination(
             item: $store.scope(state: \.player, action: \.player)
         ) { playerStore in
             PlayerDetailView(store: playerStore)
