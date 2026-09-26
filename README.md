@@ -15,15 +15,19 @@ export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 ## Tests
 
-From the repo root, with `DEVELOPER_DIR` set as above:
+From the repo root. Xcode is `/Applications/Xcode.app`. A fresh derived-data directory and explicit modules off are required on this machine; a plain `xcodebuild test` fails here.
 
 ```sh
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+rm -rf /tmp/SuperSoccer2Derived
 xcodebuild test \
   -project SuperSoccer2.xcodeproj \
   -scheme SuperSoccer2 \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -derivedDataPath /tmp/SuperSoccer2Derived \
   -skipMacroValidation \
-  -skipPackagePluginValidation
+  -skipPackagePluginValidation \
+  SWIFT_ENABLE_EXPLICIT_MODULES=NO
 ```
 
-`iPhone 17` is an installed simulator. `-skipMacroValidation` and `-skipPackagePluginValidation` are required here so the Swift package macros are allowed to build.
+`iPhone 17` is an installed simulator. `-skipMacroValidation` and `-skipPackagePluginValidation` let the Swift package macros build.
