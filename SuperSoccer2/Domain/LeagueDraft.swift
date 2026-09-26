@@ -212,7 +212,7 @@ enum LeagueDraft {
             listName: template.listName,
             nickname: template.nickname,
             kit: template.kit,
-            starters: roster.filter(\.isStarter)
+            players: roster
         )
     }
 

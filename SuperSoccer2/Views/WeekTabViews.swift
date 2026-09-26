@@ -39,10 +39,14 @@ struct ClubTab: View {
                 club: club,
                 played: store.userStanding?.played ?? 0,
                 points: store.userStanding?.points ?? 0,
-                goalDifference: store.userStanding?.goalDifference ?? 0
-            ) { id in
-                store.send(.view(.playerTapped(id)))
-            }
+                goalDifference: store.userStanding?.goalDifference ?? 0,
+                canManage: true,
+                offers: store.skillOffers,
+                choices: store.skillChoices,
+                onPlayer: { store.send(.view(.playerTapped($0))) },
+                onRest: { store.send(.view(.restStarter($0))) },
+                onSkill: { store.send(.view(.skillStatTapped($0, $1))) }
+            )
         } else {
             TeamMissing()
         }

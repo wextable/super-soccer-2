@@ -85,6 +85,11 @@ struct Ratings: Equatable, Sendable {
 }
 
 struct Player: Equatable, Sendable, Identifiable {
+    struct Injury: Equatable, Sendable {
+        var label: String
+        var weeksLeft: Int
+    }
+
     var id: String
     var firstName: String
     var lastName: String
@@ -93,6 +98,10 @@ struct Player: Equatable, Sendable, Identifiable {
     /// Set during the tier draft. The match reads starters only.
     var isStarter: Bool = false
     var ratings: Ratings
+    var xp: Int = 0
+    /// Skills already spent. The next skill costs more.
+    var skillsEarned: Int = 0
+    var injury: Injury? = nil
 
     var fullName: String {
         if firstName.isEmpty {
@@ -101,9 +110,13 @@ struct Player: Equatable, Sendable, Identifiable {
         return "\(firstName) \(lastName)"
     }
 
-    /// Integer blend, then the condition scale. Full fitness leaves the blend unchanged.
+    /// Integer blend, then the fitness-band scale. Green leaves the blend unchanged.
     var overall: Int {
         adjusted(ratings.overall(for: position))
+    }
+
+    func fitnessBand(tuning: WeekTuning = .current) -> FitnessBand {
+        tuning.band(for: condition)
     }
 
     var scoring: Int {
@@ -119,7 +132,7 @@ struct Player: Equatable, Sendable, Identifiable {
     }
 
     private func adjusted(_ rating: Int) -> Int {
-        let effectiveness = 100 - ((100 - Double(condition)) * 0.1)
-        return Int(Double(rating) * (effectiveness / 100))
+        let scale = WeekTuning.current.ratingScale(for: fitnessBand())
+        return Int(Double(rating) * scale)
     }
 }
