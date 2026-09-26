@@ -29,7 +29,7 @@ enum FitnessBand: Equatable, Sendable {
 }
 
 /// One of the six ratings. A skill pick adds points to exactly one of these.
-enum PlayerStat: String, Equatable, Sendable, CaseIterable, Identifiable {
+enum PlayerStat: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case speed
     case shooting
     case passing
@@ -62,7 +62,7 @@ enum PlayerStat: String, Equatable, Sendable, CaseIterable, Identifiable {
 }
 
 /// A stat the player can spend a skill on, with the points that skill adds.
-struct SkillChoice: Equatable, Sendable, Identifiable {
+struct SkillChoice: Codable, Equatable, Sendable, Identifiable {
     var stat: PlayerStat
     var points: Int
 
@@ -70,7 +70,7 @@ struct SkillChoice: Equatable, Sendable, Identifiable {
 }
 
 /// One player earned one skill. The stat is still unspent until someone picks it.
-struct SkillOffer: Equatable, Sendable, Identifiable {
+struct SkillOffer: Codable, Equatable, Sendable, Identifiable {
     var id: String
     var playerID: String
     var clubID: String

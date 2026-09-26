@@ -465,16 +465,27 @@ struct AppFeatureTests {
             AppFeature()
         } withDependencies: {
             $0.entropy.nextSeed = { 42 }
+            $0.careerStore = .inMemory()
         }
         store.exhaustivity = .off
 
-        await store.send(.selection(.view(.onAppear)))
-        #expect(store.state.selection.clubs.map(\.name) == ["Manchester City", "Norwich City"])
-        #expect(store.state.selection.season?.clubs.count == 20)
-
-        await store.send(.selection(.view(.clubTapped("norwich-city"))))
+        await store.send(.frontDoor(.view(.onAppear)))
         await store.skipReceivedActions()
-        guard let pathID = store.state.path.ids.first else {
+        #expect(store.state.frontDoor.canContinue == false)
+        await store.send(.frontDoor(.view(.newGameButtonTapped)))
+        await store.skipReceivedActions()
+        guard let selectionID = store.state.path.ids.first else {
+            Issue.record("Club selection was not pushed")
+            return
+        }
+        await store.send(.path(.element(id: selectionID, action: .selection(.view(.onAppear)))))
+        let selection = try #require(store.state.path[id: selectionID, case: \.selection])
+        #expect(selection.clubs.map(\.name) == ["Manchester City", "Norwich City"])
+        #expect(selection.season?.clubs.count == 20)
+
+        await store.send(.path(.element(id: selectionID, action: .selection(.view(.clubTapped("norwich-city"))))))
+        await store.skipReceivedActions()
+        guard let pathID = store.state.path.ids.last else {
             Issue.record("The week was not pushed")
             return
         }

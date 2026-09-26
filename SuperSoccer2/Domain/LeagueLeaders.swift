@@ -2,13 +2,13 @@ import Foundation
 
 /// Goals, assists, and saves taken from the shots the match already records.
 enum LeagueLeaders {
-    struct Counts: Equatable, Sendable {
+    struct Counts: Codable, Equatable, Sendable {
         var goals: Int = 0
         var assists: Int = 0
         var saves: Int = 0
     }
 
-    struct Tally: Equatable, Sendable {
+    struct Tally: Codable, Equatable, Sendable {
         var playerID: String
         var clubID: String
         var goals: Int

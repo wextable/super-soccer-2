@@ -27,6 +27,8 @@ xcodebuild test \
 
 `AppView` in `SuperSoccer2/App/SuperSoccer2App.swift` installs the theme (`Theme.starbyte` from `SuperSoccer2/Theme.swift`). Screens read `Theme` from the environment.
 
+`CareerStore` reads and writes the single career file.
+
 `WeekTuning` is `SuperSoccer2/Domain/WeekTuning.swift`.
 
 The week is four tabs — Club, Table, Week, and Match — in `SuperSoccer2/Matchweek/MatchweekView.swift`.

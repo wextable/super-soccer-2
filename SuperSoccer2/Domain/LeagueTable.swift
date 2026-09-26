@@ -1,6 +1,6 @@
 import Foundation
 
-struct Standing: Equatable, Sendable, Identifiable {
+struct Standing: Codable, Equatable, Sendable, Identifiable {
     var clubID: String
     var played: Int
     var points: Int
