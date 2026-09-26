@@ -437,9 +437,23 @@ struct MatchStatsTests {
         )
         #expect(state.rows.map(\.result) == [.save, .goal])
         #expect(state.rows.map(\.name) == ["Udder Quartz", "Queef Pistacio"])
+        #expect(state.rows.map(\.assist) == [nil, nil])
         #expect(state.rows.allSatisfy { $0.result != .miss })
         #expect(state.homeGoals == 0)
         #expect(state.awayGoals == 1)
+    }
+
+    @Test func anAssistSitsUnderTheScorer() {
+        let state = MatchStatsFeature.State(
+            shots: [
+                makeShot(result: .goal, shooter: "Bo Scaramucci", passer: "Chode Magnusson"),
+                makeShot(id: 1, minute: 20, result: .save, shooter: "Ada Striker", passer: "Hank Buckwalter", keeper: "Udder Quartz")
+            ],
+            homeShort: "MCI",
+            awayShort: "NOR"
+        )
+        #expect(state.rows.map(\.name) == ["Bo Scaramucci", "Udder Quartz"])
+        #expect(state.rows.map(\.assist) == ["Chode Magnusson", "Hank Buckwalter"])
     }
 }
 

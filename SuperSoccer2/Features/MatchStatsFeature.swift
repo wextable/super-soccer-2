@@ -19,6 +19,7 @@ struct MatchStatsFeature {
             var result: ShotResult
             var isPenalty: Bool
             var isHome: Bool
+            var assist: String?
         }
 
         var homeGoals: Int {
@@ -51,7 +52,8 @@ struct MatchStatsFeature {
                         name: shot.result == .save ? shot.keeper.fullName : shot.shooter.fullName,
                         result: shot.result,
                         isPenalty: shot.type == .penalty,
-                        isHome: shot.isHome
+                        isHome: shot.isHome,
+                        assist: shot.passer?.fullName
                     )
                 }
         }

@@ -298,26 +298,31 @@ struct MatchweekFeatureTests {
             MatchweekFeature()
         }
         #expect(MatchweekFeature.State.Tab.allCases == [.club, .table, .week, .match])
-        #expect(store.state.tab == .match)
+        #expect(store.state.tab == .club)
         #expect(store.state.weekLines.count == 10)
         #expect(store.state.keyPlayers.count == 3)
         let best = try #require(store.state.opponent?.starters.map(\.overall).max())
         #expect(store.state.keyPlayers.first?.overall == best)
         let player = try #require(store.state.userClub?.starters.first)
 
+        await store.send(.view(.tabSelected(.table))) {
+            $0.tab = .table
+        }
         await store.send(.view(.tabSelected(.club))) {
             $0.tab = .club
         }
         await store.send(.view(.playerTapped(player.id))) {
-            $0.player = PlayerDetailFeature.State(player: player)
+            $0.player = PlayerDetailFeature.State(player: player, clubName: "Manchester City")
         }
         #expect(store.state.player?.player.fullName == player.fullName)
+        #expect(store.state.player?.clubName == "Manchester City")
         await store.send(.player(.dismiss)) {
             $0.player = nil
         }
         let key = try #require(store.state.keyPlayers.first)
+        let opponentName = try #require(store.state.opponent?.name)
         await store.send(.view(.playerTapped(key.id))) {
-            $0.player = PlayerDetailFeature.State(player: key)
+            $0.player = PlayerDetailFeature.State(player: key, clubName: opponentName)
         }
         #expect(store.state.player?.player.id == key.id)
         await store.send(.player(.dismiss)) {
@@ -384,7 +389,7 @@ struct MatchweekFeatureTests {
         let leader = try #require(goals.first)
         await store.send(.view(.leadersButtonTapped))
         await store.send(.leaders(.presented(.view(.playerTapped(leader.player.id)))))
-        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player))
+        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player, clubName: leader.clubName))
 
         let frozen = (goals, assists, saves)
         await store.send(.view(.replayButtonTapped))
@@ -461,7 +466,8 @@ struct MatchweekFeatureTests {
         #expect(store.state.championship?.record == record)
         #expect(store.state.championship?.goals.map(\.player.id) == store.state.goalLeaders.filter { $0.clubID == championID }.map(\.player.id))
         await store.send(.championship(.presented(.view(.awardTapped(.goldenBoot)))))
-        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player))
+        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player, clubName: boot.clubName))
+        #expect(store.state.championship?.userClubID == "manchester-city")
 
         await store.send(.view(.replayButtonTapped))
         await store.send(.highlight(.presented(.view(.skipButtonTapped))))
@@ -508,7 +514,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.currentWeekIsInTheTable)
         #expect(store.state.playedHomeScore == home)
         #expect(store.state.playedAwayScore == away)
-        #expect(store.state.tab == .match)
+        #expect(store.state.tab == .club)
         #expect(store.state.standings.allSatisfy { $0.played == 1 })
     }
 
@@ -525,7 +531,7 @@ struct MatchweekFeatureTests {
         await simulated.send(.view(.simulateMatchButtonTapped))
         #expect(simulated.state.highlight == nil)
         #expect(simulated.state.stats == nil)
-        #expect(simulated.state.tab == .match)
+        #expect(simulated.state.tab == .club)
         #expect(simulated.state.currentWeekIsInTheTable)
         #expect(simulated.state.playedHomeScore != nil)
         #expect(simulated.state.playedAwayScore != nil)
@@ -580,7 +586,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.hasNextFixture == false)
         #expect(store.state.highlight == nil)
         #expect(store.state.stats == nil)
-        #expect(store.state.tab == .match)
+        #expect(store.state.tab == .club)
         #expect(store.state.standings.allSatisfy { $0.played == 38 })
         #expect(store.state.record?.awards.map(\.kind) == AwardKind.allCases)
         let afterSeason = try #require(store.state.standings.first { $0.clubID == "manchester-city" })
@@ -596,6 +602,36 @@ struct MatchweekFeatureTests {
         await fresh.send(.seasonAlert(.presented(.confirm)))
         #expect(fresh.state.standings == store.state.standings)
         #expect(fresh.state.record == store.state.record)
+    }
+
+    @Test func aTableRowPushesTheSameTeamScreen() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        }
+        let city = try #require(store.state.userClub)
+        let other = try #require(store.state.clubs.first { $0.id != city.id })
+
+        await store.send(.view(.teamButtonTapped(city.id))) {
+            $0.team = TeamFeature.State(club: city, played: 0, points: 0, goalDifference: 0)
+        }
+        let cityPlayer = try #require(city.starters.first)
+        await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
+            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name)
+        }
+        await store.send(.team(.presented(.player(.dismiss)))) {
+            $0.team?.player = nil
+        }
+        await store.send(.team(.dismiss)) {
+            $0.team = nil
+        }
+
+        await store.send(.view(.teamButtonTapped(other.id))) {
+            $0.team = TeamFeature.State(club: other, played: 0, points: 0, goalDifference: 0)
+        }
+        #expect(store.state.team?.club.name == other.name)
+        await store.send(.view(.teamButtonTapped("missing")))
+        #expect(store.state.team?.club.id == other.id)
     }
 }
 
@@ -633,4 +669,31 @@ private func listedShots(_ shots: [Shot]) -> [Shot] {
             return lhs.offset < rhs.offset
         }
         .map(\.element)
+}
+
+@Suite
+@MainActor
+struct LeadersListTests {
+    @Test func eachBoardStartsWithTenAndCanExpand() async {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let players = Array(season.clubs.flatMap(\.starters).prefix(12))
+        let rows = players.enumerated().map { index, player in
+            LeagueLeaders.Row(player: player, clubID: player.id.hasPrefix("manchester-city") ? "manchester-city" : "other", clubName: "Club", count: 30 - index)
+        }
+        let store = TestStore(
+            initialState: LeadersFeature.State(goals: rows, assists: rows, saves: [], userClubID: "manchester-city")
+        ) {
+            LeadersFeature()
+        }
+        #expect(store.state.listedGoals.count == 10)
+        #expect(store.state.goalsCanExpand)
+        #expect(store.state.listedAssists.count == 10)
+        #expect(store.state.savesCanExpand == false)
+        await store.send(.view(.expandGoalsTapped)) {
+            $0.goalsExpanded = true
+        }
+        #expect(store.state.listedGoals.count == 12)
+        #expect(store.state.goalsCanExpand == false)
+        #expect(store.state.listedAssists.count == 10)
+    }
 }

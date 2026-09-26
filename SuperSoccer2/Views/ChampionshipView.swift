@@ -73,16 +73,16 @@ struct ChampionshipView: View {
                         store.send(.view(.awardTapped(award.kind)))
                     } label: {
                         HStack(spacing: theme.space.sm) {
-                            VStack(alignment: .leading, spacing: theme.space.xxs) {
+                            VStack(alignment: .leading, spacing: theme.space.sm) {
                                 Text(award.kind.title)
                                     .font(theme.type.eyebrow)
                                     .foregroundStyle(theme.colors.action.color)
                                 Text(award.player.fullName)
                                     .font(theme.type.playerName)
-                                    .foregroundStyle(theme.colors.text.color)
-                                Text(award.clubName)
+                                    .foregroundStyle(isYours(award) ? theme.colors.action.color : theme.colors.text.color)
+                                Text(isYours(award) ? "Your club · \(award.clubName)" : award.clubName)
                                     .font(theme.type.captionNumber)
-                                    .foregroundStyle(theme.colors.secondaryText.color)
+                                    .foregroundStyle(isYours(award) ? theme.colors.action.color : theme.colors.secondaryText.color)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             Text(statLine(award))
@@ -90,10 +90,11 @@ struct ChampionshipView: View {
                                 .foregroundStyle(theme.colors.text.color)
                                 .multilineTextAlignment(.trailing)
                         }
+                        .padding(.vertical, theme.space.sm)
                         .frame(minHeight: theme.metrics.minimumControl)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(award.kind.title), \(award.player.fullName), \(award.clubName), \(statLine(award))")
+                    .accessibilityLabel(awardLabel(award))
                     if award.id != store.record.awards.last?.id {
                         WeekHairline()
                     }
@@ -139,6 +140,15 @@ struct ChampionshipView: View {
                 }
             }
         }
+    }
+
+    private func awardLabel(_ award: Award) -> String {
+        let club = isYours(award) ? "your club, \(award.clubName)" : award.clubName
+        return "\(award.kind.title), \(award.player.fullName), \(club), \(statLine(award))"
+    }
+
+    private func isYours(_ award: Award) -> Bool {
+        award.clubID == store.userClubID
     }
 
     private func statLine(_ award: Award) -> String {
