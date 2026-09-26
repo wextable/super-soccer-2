@@ -55,6 +55,8 @@ struct MatchweekView: View {
             MatchLineView(week: store, highlight: highlightStore)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.committedWeeks)
+        .sensoryFeedback(.selection, trigger: store.lineupRevision)
+        .sensoryFeedback(.success, trigger: store.skillsChosen)
     }
 
     private var tabSelection: Binding<MatchweekFeature.State.Tab> {

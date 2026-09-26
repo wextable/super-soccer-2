@@ -9,6 +9,9 @@ struct PlayerDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
+                if store.canManage, let bestFit = store.bestFit {
+                    swap(bestFit)
+                }
                 ratings
             }
             .padding(theme.space.lg)
@@ -33,8 +36,52 @@ struct PlayerDetailView: View {
             Text("Overall \(store.player.overall)")
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)
+            Text(fitnessLine)
+                .font(theme.type.homeLine)
+                .foregroundStyle(fitnessColor)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private func swap(_ bestFit: Player) -> some View {
+        VStack(alignment: .leading, spacing: theme.space.sm) {
+            Text("Bring in")
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
+            Button("Rest, bring in \(bestFit.fullName)") {
+                store.send(.view(.bestFitTapped))
+            }
+            .buttonStyle(ThemeActionButtonStyle())
+            .accessibilityLabel("Rest \(store.player.fullName) and bring in \(bestFit.fullName)")
+            if !store.alternatives.isEmpty {
+                Text("Or someone else")
+                    .font(theme.type.eyebrow)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+                WeekCard {
+                    ForEach(Array(store.alternatives.enumerated()), id: \.element.id) { index, player in
+                        Button {
+                            store.send(.view(.alternativeTapped(player.id)))
+                        } label: {
+                            HStack {
+                                Text(player.fullName)
+                                    .font(theme.type.playerName)
+                                    .foregroundStyle(theme.colors.text.color)
+                                Spacer()
+                                Text("\(player.overall)")
+                                    .font(theme.type.playerOverall)
+                                    .foregroundStyle(theme.colors.text.color)
+                            }
+                            .frame(minHeight: theme.metrics.minimumControl)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Bring in \(player.fullName), overall \(player.overall)")
+                        if index < store.alternatives.count - 1 {
+                            WeekHairline()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var ratings: some View {
@@ -66,6 +113,23 @@ struct PlayerDetailView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name) \(value)")
+    }
+
+    private var fitnessLine: String {
+        if let injury = store.player.injury {
+            let weeks = injury.weeksLeft == 1 ? "1 week" : "\(injury.weeksLeft) weeks"
+            return "Out · \(injury.label) · \(weeks)"
+        }
+        return "\(store.player.fitnessBand().label) · fitness \(store.player.condition)"
+    }
+
+    private var fitnessColor: Color {
+        if store.player.injury != nil { return theme.colors.fitnessRed.color }
+        switch store.player.fitnessBand() {
+        case .green: return theme.colors.fitnessGreen.color
+        case .yellow: return theme.colors.fitnessYellow.color
+        case .red: return theme.colors.fitnessRed.color
+        }
     }
 
     private var positionName: String {

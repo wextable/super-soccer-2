@@ -303,7 +303,9 @@ struct MatchweekFeatureTests {
         #expect(store.state.keyPlayers.count == 3)
         let best = try #require(store.state.opponent?.starters.map(\.overall).max())
         #expect(store.state.keyPlayers.first?.overall == best)
-        let player = try #require(store.state.userClub?.starters.first)
+        let club = try #require(store.state.userClub)
+        let player = try #require(club.starters.first)
+        let detail = store.state.playerDetail(for: player, in: club)
 
         await store.send(.view(.tabSelected(.table))) {
             $0.tab = .table
@@ -312,7 +314,7 @@ struct MatchweekFeatureTests {
             $0.tab = .club
         }
         await store.send(.view(.playerTapped(player.id))) {
-            $0.player = PlayerDetailFeature.State(player: player, clubName: "Manchester City")
+            $0.player = detail
         }
         #expect(store.state.player?.player.fullName == player.fullName)
         #expect(store.state.player?.clubName == "Manchester City")
@@ -613,11 +615,17 @@ struct MatchweekFeatureTests {
         let other = try #require(store.state.clubs.first { $0.id != city.id })
 
         await store.send(.view(.teamButtonTapped(city.id))) {
-            $0.team = TeamFeature.State(club: city, played: 0, points: 0, goalDifference: 0)
+            $0.team = TeamFeature.State(club: city, played: 0, points: 0, goalDifference: 0, canManage: true)
         }
         let cityPlayer = try #require(city.starters.first)
         await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
-            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name)
+            $0.team?.player = PlayerDetailFeature.State(
+                player: cityPlayer,
+                clubName: city.name,
+                canManage: true,
+                bestFit: WeekBetween.bestFit(replacing: cityPlayer, in: city.players),
+                alternatives: WeekBetween.alternatives(replacing: cityPlayer, in: city.players)
+            )
         }
         await store.send(.team(.presented(.player(.dismiss)))) {
             $0.team?.player = nil

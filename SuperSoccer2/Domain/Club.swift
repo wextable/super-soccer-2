@@ -20,10 +20,29 @@ struct Club: Equatable, Sendable, Identifiable {
     var listName: String
     var nickname: String
     var kit: Kit
-    var starters: [Player]
+    /// The whole squad. Starters are the ones flagged to play.
+    var players: [Player]
+
+    var starters: [Player] {
+        players.filter(\.isStarter)
+    }
+
+    var bench: [Player] {
+        players.filter { !$0.isStarter }
+    }
 
     var keeper: Player {
         starters.first { $0.position == .keeper } ?? starters[0]
+    }
+
+    /// One line per injured player. The club shows these. There is no separate injury screen.
+    var injuryLines: [String] {
+        players.compactMap { player in
+            guard let injury = player.injury else { return nil }
+            let weeks = injury.weeksLeft == 1 ? "1 week" : "\(injury.weeksLeft) weeks"
+            return "\(player.fullName) is out · \(injury.label) · \(weeks)"
+        }
+        .sorted()
     }
 
     /// Summary of the attack and defense the match uses. Not the average of the eleven player overalls.

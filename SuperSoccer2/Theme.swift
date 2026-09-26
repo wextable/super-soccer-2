@@ -32,6 +32,9 @@ extension Theme {
         var shadow: AppearanceColor
         /// Debug-only controls. Not the action cyan.
         var danger: AppearanceColor
+        var fitnessGreen: AppearanceColor
+        var fitnessYellow: AppearanceColor
+        var fitnessRed: AppearanceColor
         /// Commentary stays the bright cyan on a near-black strip in both appearances.
         var ticker: AppearanceColor
         var tickerBackground: AppearanceColor
@@ -49,6 +52,9 @@ extension Theme {
             hairline: AppearanceColor(light: .byte(213, 224, 216), dark: .byte(42, 58, 48)),
             shadow: AppearanceColor(light: .byte(0, 0, 0, 0.08), dark: .byte(0, 0, 0, 0.08)),
             danger: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 99, 99)),
+            fitnessGreen: AppearanceColor(light: .byte(15, 110, 52), dark: .byte(102, 220, 140)),
+            fitnessYellow: AppearanceColor(light: .byte(140, 84, 0), dark: .byte(255, 196, 72)),
+            fitnessRed: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 120, 110)),
             ticker: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
             tickerBackground: AppearanceColor(light: .byte(7, 17, 12), dark: .byte(7, 17, 12))
         )

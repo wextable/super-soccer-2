@@ -83,7 +83,7 @@ enum SeasonAwards {
         else { return nil }
 
         let players = clubs.flatMap { club in
-            club.starters.map { player in
+            club.players.map { player in
                 Candidate(
                     player: player,
                     clubID: club.id,

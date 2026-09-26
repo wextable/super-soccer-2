@@ -18,6 +18,11 @@ struct MatchweekFeature {
         var record: SeasonRecord?
         var didFail: Bool
         var tab: Tab
+        /// Skills the user has not spent yet. A week can add zero or several.
+        var skillOffers: [SkillOffer]
+        var skillChoices: [SkillChoice]
+        var lineupRevision: Int
+        var skillsChosen: Int
         @Presents var highlight: HighlightFeature.State?
         @Presents var stats: MatchStatsFeature.State?
         @Presents var leaders: LeadersFeature.State?
@@ -55,6 +60,10 @@ struct MatchweekFeature {
             record = nil
             didFail = false
             tab = .club
+            skillOffers = []
+            skillChoices = WeekTuning.current.skillChoices
+            lineupRevision = 0
+            skillsChosen = 0
             highlight = nil
             stats = nil
             leaders = nil
@@ -192,7 +201,7 @@ struct MatchweekFeature {
 
         fileprivate func squadPlayer(_ id: Player.ID) -> (club: Club, player: Player)? {
             for club in clubs {
-                if let player = club.starters.first(where: { $0.id == id }) {
+                if let player = club.players.first(where: { $0.id == id }) {
                     return (club, player)
                 }
             }
@@ -204,7 +213,7 @@ struct MatchweekFeature {
         }
 
         private func ranked(_ count: KeyPath<LeagueLeaders.Counts, Int>) -> [LeagueLeaders.Row] {
-            let players = Dictionary(uniqueKeysWithValues: clubs.flatMap(\.starters).map { ($0.id, $0) })
+            let players = Dictionary(uniqueKeysWithValues: clubs.flatMap(\.players).map { ($0.id, $0) })
             let clubsByID = Dictionary(uniqueKeysWithValues: clubs.map { ($0.id, $0) })
             return totals.compactMap { playerID, counts -> LeagueLeaders.Row? in
                 let value = counts[keyPath: count]
@@ -224,7 +233,7 @@ struct MatchweekFeature {
             }
         }
 
-        fileprivate mutating func commitPendingWeek() {
+        fileprivate mutating func commitPendingWeek(choosesUserSkills: Bool = false) {
             guard let pending, !currentWeekIsInTheTable else { return }
             standings = LeagueTable.applying(pending.scorelines, to: standings)
             totals = SeasonTotals.adding(pending.tallies, to: totals)
@@ -233,10 +242,50 @@ struct MatchweekFeature {
                     playerClub[tally.playerID] = tally.clubID
                 }
             }
+            let tuning = WeekTuning.current
+            let settlement = WeekBetween.settle(
+                clubs: clubs,
+                scorelines: pending.scorelines,
+                tallies: pending.tallies,
+                userClubID: userClubID,
+                seed: pending.userMatch.seed &+ 91,
+                tuning: tuning
+            )
+            clubs = settlement.clubs
+            for offer in settlement.offers {
+                var copy = offer
+                copy.id = "\(weekIndex)|\(offer.id)|\(skillOffers.count)"
+                skillOffers.append(copy)
+            }
+            skillChoices = tuning.skillChoices
+            if choosesUserSkills {
+                var offers = skillOffers
+                var squads = clubs
+                WeekBetween.resolveAutomatically(&offers, clubs: &squads, tuning: tuning)
+                skillOffers = offers
+                clubs = squads
+            }
             committedWeeks = weekIndex + 1
             if seasonIsOver {
                 record = SeasonAwards.make(clubs: clubs, table: table, totals: totals)
             }
+            if let teamID = team?.club.id, let club = clubs.first(where: { $0.id == teamID }) {
+                team?.club = club
+            }
+            if let current = player?.player.id, let found = squadPlayer(current) {
+                player = playerDetail(for: found.player, in: found.club)
+            }
+        }
+
+        func playerDetail(for player: Player, in club: Club) -> PlayerDetailFeature.State {
+            let manages = club.id == userClubID && player.isStarter && player.injury == nil
+            return PlayerDetailFeature.State(
+                player: player,
+                clubName: club.name,
+                canManage: manages,
+                bestFit: manages ? WeekBetween.bestFit(replacing: player, in: club.players) : nil,
+                alternatives: manages ? WeekBetween.alternatives(replacing: player, in: club.players) : []
+            )
         }
     }
 
@@ -262,6 +311,8 @@ struct MatchweekFeature {
             case championshipButtonTapped
             case teamButtonTapped(String)
             case playerTapped(Player.ID)
+            case restStarter(Player.ID)
+            case skillStatTapped(String, PlayerStat)
         }
 
         @CasePathable
@@ -375,13 +426,30 @@ struct MatchweekFeature {
                     club: club,
                     played: standing?.played ?? 0,
                     points: standing?.points ?? 0,
-                    goalDifference: standing?.goalDifference ?? 0
+                    goalDifference: standing?.goalDifference ?? 0,
+                    canManage: id == state.userClubID
                 )
                 return .none
 
             case let .view(.playerTapped(id)):
                 guard let found = state.squadPlayer(id) else { return .none }
-                state.player = PlayerDetailFeature.State(player: found.player, clubName: found.club.name)
+                state.player = state.playerDetail(for: found.player, in: found.club)
+                return .none
+
+            case let .view(.restStarter(id)):
+                rest(id, in: &state)
+                return .none
+
+            case let .view(.skillStatTapped(offerID, stat)):
+                var offers = state.skillOffers
+                var squads = state.clubs
+                guard WeekBetween.apply(stat, offerID: offerID, offers: &offers, clubs: &squads) else {
+                    return .none
+                }
+                state.skillOffers = offers
+                state.clubs = squads
+                state.skillsChosen += 1
+                refreshPresented(&state)
                 return .none
 
             case .highlight(.presented(.delegate(.dismissed))):
@@ -406,6 +474,15 @@ struct MatchweekFeature {
                 state.highlight = nil
                 state.stats = nil
                 state.commitPendingWeek()
+                return .none
+
+            case let .team(.presented(.delegate(.replace(outgoing, incoming)))):
+                replace(outgoing, with: incoming, in: &state)
+                return .none
+
+            case let .player(.presented(.delegate(.replace(incoming)))):
+                guard let outgoing = state.player?.player.id else { return .none }
+                replace(outgoing, with: incoming, in: &state)
                 return .none
 
             case .stats, .leaders, .championship, .team, .player:
@@ -470,7 +547,34 @@ struct MatchweekFeature {
                 state.didFail = false
             }
             guard ensurePending(&state) else { return }
-            state.commitPendingWeek()
+            state.commitPendingWeek(choosesUserSkills: true)
+        }
+        refreshPresented(&state)
+    }
+
+    private func rest(_ id: Player.ID, in state: inout State) {
+        guard let club = state.clubs.first(where: { $0.id == state.userClubID }),
+              let starter = club.players.first(where: { $0.id == id }),
+              let incoming = WeekBetween.bestFit(replacing: starter, in: club.players)
+        else { return }
+        replace(id, with: incoming.id, in: &state)
+    }
+
+    private func replace(_ outgoingID: Player.ID, with incomingID: Player.ID, in state: inout State) {
+        guard let index = state.clubs.firstIndex(where: { $0.id == state.userClubID }),
+              let updated = WeekBetween.replace(outgoingID, with: incomingID, in: state.clubs[index])
+        else { return }
+        state.clubs[index] = updated
+        state.lineupRevision += 1
+        state.player = nil
+        state.team?.player = nil
+        refreshPresented(&state)
+    }
+
+    private func refreshPresented(_ state: inout State) {
+        if let teamID = state.team?.club.id,
+           let club = state.clubs.first(where: { $0.id == teamID }) {
+            state.team?.club = club
         }
     }
 }
