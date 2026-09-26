@@ -1,32 +1,48 @@
-# SuperSoccer2 — read this first
+# SuperSoccer2
 
-iPhone and iPad soccer management. TCA, SwiftUI, and Swift concurrency. iOS 18+, Swift 6. The user plays as Manchester City or Norwich City. The week is four tabs — Club, Table, Week, and Match — on iPhone and iPad. Kickoff covers the tabs with the highlight reel, then full-time stats. The other fixtures that week are scorelines, and the table records the week when you come back. There is no second season.
+Start here. iPhone and iPad soccer management, built with TCA and SwiftUI.
 
 ## Git
 
-Start new work on a new branch from `main`. The user pushes, opens pull requests, and merges. Do not push or open a pull request unless the user asks.
+New work branches from `main`. The user pushes and opens pull requests. Agents do not push or open a pull request unless asked.
 
-## Where the game lives
+## Tests
 
-- Match function: `MatchSimulator.simulate` in `SuperSoccer2/Domain/MatchSimulator.swift`. Same squads and seed, same match. Do not change the sim formulas unless asked.
-- Names: `SuperSoccer2/Domain/NameGenerator.swift`. The list and the rolls come from the old app.
-- Draft: `SuperSoccer2/Domain/LeagueDraft.swift`. A launch builds the twenty-club pool and tier draft. Club selection still offers only Manchester City and Norwich City. The week uses every club and `seasonFixtures`.
-- Week: `MatchweekFeature` and `LeagueTable`. Four tabs: Club (a player pushes a detail screen), Table, Week (fixtures and results), and Match (opponent, ratings, key players, kickoff). The week opens on Club. A table row pushes that same team screen. Leaders list ten names until the rest are shown. The week button says Advance week. A key player opens the same player detail. When the 38-week list is finished there is no next fixture, and the championship screen names the champion and that club’s leaders. The finished season stores the champion and six awards. Points are 3 for a win and 1 for a draw. The table sorts by points, then goal difference, then `Club.overall`. The table updates when the reel is left early or when full-time stats is dismissed. Full time can also go straight back to the week. Simulate match records the fixture without the reel. Debug builds can simulate the remaining weeks after a confirmation. After the match, starters lose fitness and the bench gains it. Green, yellow, and red are on the player row. The user can rest a starter for the best fit in that role, or pick someone else. Other clubs rest one yellow or red player. An injury is a line on the club, and the next fit player in that role steps in. Condition scales the ratings the match already uses. A week can offer zero skills or several, and each pick is one stat. Those weights live on `WeekTuning`.
-- Season check, not a second screen: `SuperSoccer2/Domain/SeasonHarness.swift`.
-- Theme: `SuperSoccer2/Theme.swift`. Screens read `Theme` from the SwiftUI environment. A new look replaces `Theme.starbyte` in `AppView` (`SuperSoccer2/App/SuperSoccer2App.swift`). Do not put colors in a reducer.
+On this machine, Xcode is `/Applications/Xcode.app`. Use a fresh derived-data directory and turn explicit modules off:
 
-## Ratings
+```sh
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+rm -rf /tmp/SuperSoccer2Derived
+xcodebuild test \
+  -project SuperSoccer2.xcodeproj \
+  -scheme SuperSoccer2 \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -derivedDataPath /tmp/SuperSoccer2Derived \
+  -skipMacroValidation \
+  -skipPackagePluginValidation \
+  SWIFT_ENABLE_EXPLICIT_MODULES=NO
+```
 
-Player overall is the position blend on `Player`. Team overall is the rounded mean of team attack and team defense, clamped to 1–99, on `Club`. The match reads attack and defense, not either overall.
+## Where things live
 
-## Skills
+`AppView` in `SuperSoccer2/App/SuperSoccer2App.swift` installs the theme (`Theme.starbyte` from `SuperSoccer2/Theme.swift`). Screens read `Theme` from the environment.
 
-Read these from `~/.cursor/skills` when the work touches them:
+`WeekTuning` is `SuperSoccer2/Domain/WeekTuning.swift`.
 
-- `ios-design-agent-skill` — iOS design
-- `swift-concurrency` — Swift concurrency
-- `rusel95-ios-agent-skills-tca-swiftui-1.0.1` — TCA and SwiftUI
+The week is four tabs — Club, Table, Week, and Match — in `SuperSoccer2/Matchweek/MatchweekView.swift`.
 
-## Old app
+Each screen is its own folder: the reducer, the view, and types only that screen uses.
 
-https://github.com/wextable/soccer is the reference for names, ratings, and match math. It is not a codebase to extend. https://github.com/wextable/superSoccer is not a source.
+- `App`
+- `ClubSelection`
+- `Matchweek`
+- `Team`
+- `PlayerDetail`
+- `Highlight`
+- `MatchStats`
+- `Leaders`
+- `Championship`
+
+Shared code stays shared. The match function is `MatchSimulator.simulate` in `SuperSoccer2/Domain/MatchSimulator.swift`. Clubs, players, the draft, and the table stay in `SuperSoccer2/Domain/`. `WeekCard` and `WeekHairline` are in `SuperSoccer2/WeekChrome.swift`.
+
+Read these from `~/.cursor/skills` when the work touches them: `ios-design-agent-skill`, `swift-concurrency`, `rusel95-ios-agent-skills-tca-swiftui-1.0.1`.
