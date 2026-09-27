@@ -233,8 +233,9 @@ struct MatchweekFeature {
             }
         }
 
-        fileprivate mutating func commitPendingWeek(choosesUserSkills: Bool = false) {
-            guard let pending, !currentWeekIsInTheTable else { return }
+        @discardableResult
+        fileprivate mutating func commitPendingWeek(choosesUserSkills: Bool = false) -> Bool {
+            guard let pending, !currentWeekIsInTheTable else { return false }
             standings = LeagueTable.applying(pending.scorelines, to: standings)
             totals = SeasonTotals.adding(pending.tallies, to: totals)
             for tally in pending.tallies where tally.goals + tally.assists + tally.saves > 0 {
@@ -275,6 +276,7 @@ struct MatchweekFeature {
             if let current = player?.player.id, let found = squadPlayer(current) {
                 player = playerDetail(for: found.player, in: found.club)
             }
+            return true
         }
 
         func playerDetail(for player: Player, in club: Club) -> PlayerDetailFeature.State {
@@ -322,6 +324,7 @@ struct MatchweekFeature {
     }
 
     @Dependency(\.entropy) var entropy
+    @Dependency(\.careerStore) var careerStore
 
     var body: some ReducerOf<Self> {
         Reduce<State, Action> { state, action in
@@ -342,8 +345,8 @@ struct MatchweekFeature {
                 guard ensurePending(&state) else { return .none }
                 state.highlight = nil
                 state.stats = nil
-                state.commitPendingWeek()
-                return .none
+                guard state.commitPendingWeek() else { return .none }
+                return save(state)
 
             case .view(.simulateSeasonButtonTapped):
                 guard !state.seasonIsOver else { return .none }
@@ -363,7 +366,7 @@ struct MatchweekFeature {
 
             case .seasonAlert(.presented(.confirm)):
                 simulateRemainingSeason(&state)
-                return .none
+                return save(state)
 
             case .seasonAlert:
                 return .none
@@ -389,7 +392,7 @@ struct MatchweekFeature {
                 state.team = nil
                 state.player = nil
                 state.didFail = false
-                return .none
+                return save(state)
 
             case let .view(.tabSelected(tab)):
                 state.tab = tab
@@ -437,8 +440,8 @@ struct MatchweekFeature {
                 return .none
 
             case let .view(.restStarter(id)):
-                rest(id, in: &state)
-                return .none
+                guard rest(id, in: &state) else { return .none }
+                return save(state)
 
             case let .view(.skillStatTapped(offerID, stat)):
                 var offers = state.skillOffers
@@ -450,13 +453,13 @@ struct MatchweekFeature {
                 state.clubs = squads
                 state.skillsChosen += 1
                 refreshPresented(&state)
-                return .none
+                return save(state)
 
             case .highlight(.presented(.delegate(.dismissed))):
                 state.highlight = nil
                 state.stats = nil
-                state.commitPendingWeek()
-                return .none
+                guard state.commitPendingWeek() else { return .none }
+                return save(state)
 
             case .highlight(.presented(.delegate(.showStats))):
                 guard state.highlight?.phase == .fullTime, let pending = state.pending else { return .none }
@@ -473,17 +476,17 @@ struct MatchweekFeature {
             case .stats(.presented(.delegate(.dismissed))):
                 state.highlight = nil
                 state.stats = nil
-                state.commitPendingWeek()
-                return .none
+                guard state.commitPendingWeek() else { return .none }
+                return save(state)
 
             case let .team(.presented(.delegate(.replace(outgoing, incoming)))):
-                replace(outgoing, with: incoming, in: &state)
-                return .none
+                guard replace(outgoing, with: incoming, in: &state) else { return .none }
+                return save(state)
 
             case let .player(.presented(.delegate(.replace(incoming)))):
                 guard let outgoing = state.player?.player.id else { return .none }
-                replace(outgoing, with: incoming, in: &state)
-                return .none
+                guard replace(outgoing, with: incoming, in: &state) else { return .none }
+                return save(state)
 
             case .stats, .leaders, .championship, .team, .player:
                 return .none
@@ -552,23 +555,31 @@ struct MatchweekFeature {
         refreshPresented(&state)
     }
 
-    private func rest(_ id: Player.ID, in state: inout State) {
+    private func rest(_ id: Player.ID, in state: inout State) -> Bool {
         guard let club = state.clubs.first(where: { $0.id == state.userClubID }),
               let starter = club.players.first(where: { $0.id == id }),
               let incoming = WeekBetween.bestFit(replacing: starter, in: club.players)
-        else { return }
-        replace(id, with: incoming.id, in: &state)
+        else { return false }
+        return replace(id, with: incoming.id, in: &state)
     }
 
-    private func replace(_ outgoingID: Player.ID, with incomingID: Player.ID, in state: inout State) {
+    private func replace(_ outgoingID: Player.ID, with incomingID: Player.ID, in state: inout State) -> Bool {
         guard let index = state.clubs.firstIndex(where: { $0.id == state.userClubID }),
               let updated = WeekBetween.replace(outgoingID, with: incomingID, in: state.clubs[index])
-        else { return }
+        else { return false }
         state.clubs[index] = updated
         state.lineupRevision += 1
         state.player = nil
         state.team?.player = nil
         refreshPresented(&state)
+        return true
+    }
+
+    private func save(_ state: State) -> Effect<Action> {
+        let career = Career(matchweek: state)
+        return .run { [careerStore] _ in
+            await careerStore.save(career)
+        }
     }
 
     private func refreshPresented(_ state: inout State) {

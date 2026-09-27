@@ -1,7 +1,7 @@
 import Foundation
 
 enum Matchweek {
-    struct Scoreline: Equatable, Sendable, Identifiable {
+    struct Scoreline: Codable, Equatable, Sendable, Identifiable {
         var homeID: String
         var awayID: String
         var homeScore: Int
@@ -14,7 +14,7 @@ enum Matchweek {
         }
     }
 
-    struct Played: Equatable, Sendable {
+    struct Played: Codable, Equatable, Sendable {
         var scorelines: [Scoreline]
         var tallies: [LeagueLeaders.Tally]
         var userMatch: MatchResult

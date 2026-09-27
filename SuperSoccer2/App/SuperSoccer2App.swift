@@ -24,9 +24,11 @@ struct AppView: View {
 
     var body: some View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
-            ClubSelectionView(store: store.scope(state: \.selection, action: \.selection))
+            FrontDoorView(store: store.scope(state: \.frontDoor, action: \.frontDoor))
         } destination: { store in
             switch store.case {
+            case let .selection(store):
+                ClubSelectionView(store: store)
             case let .matchweek(store):
                 MatchweekView(store: store)
             }

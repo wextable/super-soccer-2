@@ -18,7 +18,7 @@ enum SeasonTotals {
     }
 }
 
-enum AwardKind: String, Equatable, Sendable, CaseIterable, Identifiable {
+enum AwardKind: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case mvp
     case bestKeeper
     case bestDefender
@@ -41,7 +41,7 @@ enum AwardKind: String, Equatable, Sendable, CaseIterable, Identifiable {
 }
 
 /// One winner and the season stats already recorded for that player.
-struct Award: Equatable, Sendable, Identifiable {
+struct Award: Codable, Equatable, Sendable, Identifiable {
     var kind: AwardKind
     var player: Player
     var clubID: String
@@ -52,7 +52,7 @@ struct Award: Equatable, Sendable, Identifiable {
 }
 
 /// Champion and awards for one finished season. A later history screen can keep a list of these.
-struct SeasonRecord: Equatable, Sendable {
+struct SeasonRecord: Codable, Equatable, Sendable {
     var championClubID: String
     var championName: String
     var awards: [Award]

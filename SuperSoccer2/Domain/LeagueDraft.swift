@@ -11,7 +11,7 @@ enum LeagueDraft {
     static let maxStartingKeepers = 1
     static let maxStartingPerLine = 4
 
-    struct Fixture: Equatable, Sendable {
+    struct Fixture: Codable, Equatable, Sendable {
         var homeID: String
         var awayID: String
     }

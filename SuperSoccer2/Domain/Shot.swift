@@ -1,17 +1,17 @@
 import Foundation
 
-enum ShotType: String, Equatable, Sendable {
+enum ShotType: String, Codable, Equatable, Sendable {
     case regular
     case penalty
 }
 
-enum ShotResult: String, Equatable, Sendable {
+enum ShotResult: String, Codable, Equatable, Sendable {
     case goal
     case miss
     case save
 }
 
-struct Shot: Equatable, Sendable, Identifiable {
+struct Shot: Codable, Equatable, Sendable, Identifiable {
     var id: Int
     var type: ShotType
     var result: ShotResult
@@ -22,7 +22,7 @@ struct Shot: Equatable, Sendable, Identifiable {
     var isHome: Bool
 }
 
-struct MatchResult: Equatable, Sendable {
+struct MatchResult: Codable, Equatable, Sendable {
     var homeScore: Int
     var awayScore: Int
     var shots: [Shot]

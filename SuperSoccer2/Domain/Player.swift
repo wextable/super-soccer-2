@@ -1,6 +1,6 @@
 import Foundation
 
-enum Position: String, Equatable, Sendable, CaseIterable {
+enum Position: String, Codable, Equatable, Sendable, CaseIterable {
     case keeper
     case defender
     case midfielder
@@ -16,7 +16,7 @@ enum Position: String, Equatable, Sendable, CaseIterable {
     }
 }
 
-struct Ratings: Equatable, Sendable {
+struct Ratings: Codable, Equatable, Sendable {
     var speed: Int
     var shooting: Int
     var passing: Int
@@ -84,8 +84,8 @@ struct Ratings: Equatable, Sendable {
     }
 }
 
-struct Player: Equatable, Sendable, Identifiable {
-    struct Injury: Equatable, Sendable {
+struct Player: Codable, Equatable, Sendable, Identifiable {
+    struct Injury: Codable, Equatable, Sendable {
         var label: String
         var weeksLeft: Int
     }

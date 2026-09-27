@@ -1,17 +1,17 @@
 import Foundation
 
-struct KitColor: Equatable, Sendable {
+struct KitColor: Codable, Equatable, Sendable {
     var red: Double
     var green: Double
     var blue: Double
 }
 
-struct Kit: Equatable, Sendable {
+struct Kit: Codable, Equatable, Sendable {
     var primary: KitColor
     var secondary: KitColor
 }
 
-struct Club: Equatable, Sendable, Identifiable {
+struct Club: Codable, Equatable, Sendable, Identifiable {
     var id: String
     var name: String
     /// Three-letter code used on the scoreboard.
