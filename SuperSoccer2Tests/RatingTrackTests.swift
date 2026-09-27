@@ -68,6 +68,19 @@ struct RatingTrackTests {
         #expect(full.next == 99)
         #expect(RatingTrack.growth(full).markedPoints == 0)
     }
+
+    @Test func growthAndConditionStayInsideOneTrack() {
+        let tired = RatingTrack.fitness(full: 90, current: 80)
+        let growing = RatingTrack.growth(SkillProjection.make(current: 80, boost: 5))
+        #expect(tired.filledPoints + tired.markedPoints + tired.emptyPoints == RatingTrack.trackPoints)
+        #expect(growing.filledPoints + growing.markedPoints + growing.emptyPoints == RatingTrack.trackPoints)
+        #expect(tired.filledPoints == 80)
+        #expect(tired.markedPoints == 10)
+        #expect(growing.filledPoints == 80)
+        #expect(growing.markedPoints == 5)
+        #expect(GrowthReading.widest == "90→99")
+        #expect(GrowthReading.widest.count == SkillProjection.make(current: 80, boost: 5).reading.count)
+    }
 }
 
 @Suite
@@ -143,11 +156,8 @@ struct LineupDialogTests {
         store.exhaustivity = .off
 
         let rest = try #require(SubstitutionFeature.State.resting(starter, in: club.players))
-        #expect(rest.heading == "Bring in")
-        #expect(rest.suggestion.id == "cover")
-        #expect(rest.others.map(\.id) == ["other"])
-        #expect(rest.primaryTitle == "Rest, bring in \(cover.fullName)")
-        #expect(rest.othersHeading == "Or someone else")
+        #expect(rest.heading == "Replace with")
+        #expect(rest.candidates.map(\.id) == ["cover", "other"])
 
         await store.send(.view(.restStarter(starter.id)))
         #expect(store.state.substitution == rest)
@@ -159,7 +169,7 @@ struct LineupDialogTests {
         #expect(store.state.club == club)
 
         await store.send(.view(.restStarter(starter.id)))
-        await store.send(.substitution(.presented(.view(.otherTapped(other.id)))))
+        await store.send(.substitution(.presented(.view(.nameTapped(other.id)))))
         await store.receive { action in
             guard case let .delegate(.replace(outgoing, incoming)) = action else { return false }
             return outgoing == starter.id && incoming == other.id
@@ -168,15 +178,13 @@ struct LineupDialogTests {
         #expect(store.state.club == club)
 
         let play = try #require(SubstitutionFeature.State.playing(bench, in: club.players))
-        #expect(play.heading == "Replace")
-        #expect(play.suggestion.id == weak.id)
-        #expect(play.others.map(\.id) == [strong.id])
-        #expect(play.primaryTitle == "Play, replace \(weak.fullName)")
+        #expect(play.heading == "Replace with")
+        #expect(play.candidates.map(\.id) == [weak.id, strong.id])
 
         await store.send(.view(.playBench(bench.id)))
         #expect(store.state.substitution == play)
         #expect(store.state.club.starters.contains { $0.id == bench.id } == false)
-        await store.send(.substitution(.presented(.view(.otherTapped(strong.id)))))
+        await store.send(.substitution(.presented(.view(.nameTapped(strong.id)))))
         await store.receive { action in
             guard case let .delegate(.replace(outgoing, incoming)) = action else { return false }
             return outgoing == strong.id && incoming == bench.id

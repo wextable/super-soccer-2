@@ -62,15 +62,9 @@ struct SkillChoiceView: View {
                 store.send(.view(.statTapped(choice.stat)))
             } label: {
                 HStack(spacing: theme.space.sm) {
-                    Text(choice.stat.label)
-                        .font(theme.type.playerName)
-                        .foregroundStyle(theme.colors.text.color)
+                    RatingLabel(text: choice.stat.label)
                     RatingBar(track: .growth(projection), mark: .growth)
-                        .frame(maxWidth: .infinity)
-                    Text(projection.reading)
-                        .font(theme.type.playerOverall)
-                        .foregroundStyle(theme.colors.text.color)
-                        .lineLimit(1)
+                    GrowthReading(reading: projection.reading)
                 }
                 .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
             }

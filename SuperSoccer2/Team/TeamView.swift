@@ -10,8 +10,6 @@ struct TeamView: View {
             won: store.won,
             lost: store.lost,
             drawn: store.drawn,
-            points: store.points,
-            goalDifference: store.goalDifference,
             place: store.place,
             canManage: store.canManage,
             onPlayer: { store.send(.view(.playerTapped($0))) },
@@ -31,7 +29,7 @@ struct TeamView: View {
     }
 }
 
-/// Squad, ratings, and record. The Club tab and the table drill-in share this layout.
+/// Squad and ratings. The Club tab and the table drill-in share this layout.
 struct TeamScreen: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,8 +37,6 @@ struct TeamScreen: View {
     var won: Int
     var lost: Int
     var drawn: Int
-    var points: Int
-    var goalDifference: Int
     var place: Int?
     var canManage: Bool = false
     var onPlayer: (Player.ID) -> Void
@@ -51,7 +47,6 @@ struct TeamScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
-                record
                 if !club.injuryLines.isEmpty {
                     injuries
                 }
@@ -70,10 +65,20 @@ struct TeamScreen: View {
             Text(club.name)
                 .font(theme.type.display)
                 .foregroundStyle(theme.colors.text.color)
-            if let place {
-                Text("\(LeagueTable.placeWord(place)) in the table")
-                    .font(theme.type.homeLine)
-                    .foregroundStyle(theme.colors.secondaryText.color)
+            HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
+                if let place {
+                    Text("\(LeagueTable.placeWord(place)) in table")
+                        .font(theme.type.homeLine)
+                        .foregroundStyle(theme.colors.secondaryText.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Text("\(won)/\(lost)/\(drawn)")
+                    .font(theme.type.playerOverall)
+                    .foregroundStyle(theme.colors.text.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityLabel("\(won) wins, \(lost) losses, \(drawn) draws")
             }
             Text("Overall \(club.overall)  ·  Attack \(club.attack)  ·  Defense \(club.defense)")
                 .font(theme.type.overall)
@@ -82,33 +87,6 @@ struct TeamScreen: View {
                 .minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    private var record: some View {
-        WeekCard {
-            recordRow("W/L/D", value: "\(won)/\(lost)/\(drawn)")
-            WeekHairline()
-            recordRow("Points", value: "\(points)")
-            WeekHairline()
-            recordRow("Goal difference", value: signedGoalDifference(goalDifference))
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(won) wins, \(lost) losses, \(drawn) draws, \(points) points, goal difference \(signedGoalDifference(goalDifference))"
-        )
-    }
-
-    private func recordRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(theme.type.playerName)
-                .foregroundStyle(theme.colors.text.color)
-            Spacer()
-            Text(value)
-                .font(theme.type.playerOverall)
-                .foregroundStyle(theme.colors.text.color)
-        }
-        .frame(minHeight: theme.metrics.minimumControl)
     }
 
     private var injuries: some View {

@@ -47,7 +47,8 @@ struct CareerPersistenceTests {
         let unchangedClub = try #require(unchanged.clubs.first { $0.id == "manchester-city" })
         #expect(unchangedClub.starters.contains { $0.id == starter.id })
 
-        await store.send(.substitution(.presented(.view(.suggestionTapped))))
+        let incoming = try #require(store.state.substitution?.candidates.first?.id)
+        await store.send(.substitution(.presented(.view(.nameTapped(incoming)))))
         await store.finish()
         #expect(writes.withLock { $0 } == 2)
         let linedUp = try #require(await box.load())

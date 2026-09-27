@@ -11,8 +11,6 @@ struct ClubTab: View {
                 won: store.userStanding?.won ?? 0,
                 lost: store.userStanding?.lost ?? 0,
                 drawn: store.userStanding?.drawn ?? 0,
-                points: store.userStanding?.points ?? 0,
-                goalDifference: store.userStanding?.goalDifference ?? 0,
                 place: (store.userStanding?.played ?? 0) > 0 ? store.places[club.id] : nil,
                 canManage: true,
                 onPlayer: { store.send(.view(.playerTapped($0))) },

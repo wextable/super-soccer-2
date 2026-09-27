@@ -59,11 +59,8 @@ struct PlayerDetailView: View {
         let degraded = current != full
         return VStack(spacing: 0) {
             HStack(spacing: theme.space.sm) {
-                Text(stat.label)
-                    .font(theme.type.playerName)
-                    .foregroundStyle(theme.colors.text.color)
+                RatingLabel(text: stat.label)
                 RatingBar(track: .fitness(full: full, current: current), mark: .condition)
-                    .frame(maxWidth: .infinity)
                 FitnessNumber(current: current, full: full, showsFull: degraded)
             }
             .frame(minHeight: theme.metrics.minimumControl)

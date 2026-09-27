@@ -44,6 +44,7 @@ struct StarterRating: View {
 }
 
 /// Full-fitness rating, with the current number above a small “fit” line when condition has taken some off.
+/// The column is always as wide as the longest reading, so the bar beside it keeps one right edge.
 struct FitnessNumber: View {
     @Environment(\.theme) private var theme
     var current: Int
@@ -51,21 +52,82 @@ struct FitnessNumber: View {
     var showsFull: Bool
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            Text("\(current)")
+        ZStack(alignment: .trailing) {
+            Text(Self.ratingSample)
                 .font(theme.type.playerOverall)
-                .foregroundStyle(theme.colors.text.color)
-            if showsFull {
-                Text("fit \(full)")
-                    .font(theme.type.captionNumber)
-                    .foregroundStyle(theme.colors.secondaryText.color)
+                .lineLimit(1)
+                .hidden()
+            Text(Self.fitnessSample)
+                .font(theme.type.captionNumber)
+                .lineLimit(1)
+                .hidden()
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("\(current)")
+                    .font(theme.type.playerOverall)
+                    .foregroundStyle(theme.colors.text.color)
+                    .lineLimit(1)
+                if showsFull {
+                    Text("fit \(full)")
+                        .font(theme.type.captionNumber)
+                        .foregroundStyle(theme.colors.secondaryText.color)
+                        .lineLimit(1)
+                }
             }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// A rating stops at 99. Both samples stay in the column so a “fit” line does not shorten the bar.
+    static let ratingSample = "99"
+    static let fitnessSample = "fit 99"
+}
+
+/// Stat name reserved at the width of the longest rating, so every bar starts on the same line.
+struct RatingLabel: View {
+    @Environment(\.theme) private var theme
+    var text: String
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(PlayerStat.allCases, id: \.self) { stat in
+                Text(stat.label)
+                    .font(theme.type.playerName)
+                    .lineLimit(1)
+                    .hidden()
+            }
+            Text(text)
+                .font(theme.type.playerName)
+                .foregroundStyle(theme.colors.text.color)
+                .lineLimit(1)
         }
         .accessibilityHidden(true)
     }
 }
 
-/// A rating drawn left to right. `marked` is the slice just past the filled rating: growth, or the fitness that was lost.
+/// `80→85` or `99`. The column reserves the widest reading so a growth arrow does not shorten the bar.
+struct GrowthReading: View {
+    @Environment(\.theme) private var theme
+    var reading: String
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Text(Self.widest)
+                .font(theme.type.playerOverall)
+                .lineLimit(1)
+                .hidden()
+            Text(reading)
+                .font(theme.type.playerOverall)
+                .foregroundStyle(theme.colors.text.color)
+                .lineLimit(1)
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// Two digits, the same arrow `SkillProjection` draws, then two digits. A rating stops at 99.
+    static let widest = SkillProjection.make(current: 90, boost: 9).reading
+}
+
+/// A rating drawn left to right on one shared track. Growth and lost fitness sit inside that track. The fill is the rating.
 struct RatingBar: View {
     @Environment(\.theme) private var theme
     var track: RatingTrack
@@ -79,27 +141,32 @@ struct RatingBar: View {
     var body: some View {
         Capsule()
             .fill(theme.colors.hairline.color)
+            .frame(maxWidth: .infinity, minHeight: theme.space.sm, maxHeight: theme.space.sm)
             .overlay {
                 GeometryReader { proxy in
-                    let scale = proxy.size.width / CGFloat(RatingTrack.trackPoints)
+                    let width = proxy.size.width
+                    let scale = width / CGFloat(RatingTrack.trackPoints)
                     ZStack(alignment: .leading) {
                         if track.markedPoints > 0 {
                             Capsule()
                                 .fill(markColor)
                                 .frame(
-                                    width: scale * CGFloat(track.filledPoints + track.markedPoints),
+                                    width: min(width, scale * CGFloat(track.filledPoints + track.markedPoints)),
                                     height: proxy.size.height
                                 )
                         }
                         if track.filledPoints > 0 {
                             Capsule()
                                 .fill(theme.colors.action.color)
-                                .frame(width: scale * CGFloat(track.filledPoints), height: proxy.size.height)
+                                .frame(
+                                    width: min(width, scale * CGFloat(track.filledPoints)),
+                                    height: proxy.size.height
+                                )
                         }
                     }
+                    .frame(width: width, height: proxy.size.height, alignment: .leading)
                 }
             }
-            .frame(height: theme.space.sm)
             .clipShape(Capsule())
             .accessibilityHidden(true)
     }
