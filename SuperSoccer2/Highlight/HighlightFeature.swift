@@ -10,6 +10,8 @@ struct HighlightFeature {
 
     @ObservableState
     struct State: Equatable {
+        var homeID: String
+        var awayID: String
         var homeShort: String
         var awayShort: String
         var homeName: String
@@ -44,6 +46,8 @@ struct HighlightFeature {
         }
 
         init(match: MatchResult, home: Club, away: Club) {
+            homeID = home.id
+            awayID = away.id
             homeShort = home.shortName
             awayShort = away.shortName
             homeName = home.name

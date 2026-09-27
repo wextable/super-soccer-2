@@ -365,9 +365,9 @@ struct MatchweekFeatureTests {
             $0.player = nil
         }
         let key = try #require(store.state.keyPlayers.first)
-        let opponentName = try #require(store.state.opponent?.name)
+        let opponent = try #require(store.state.opponent)
         await store.send(.view(.playerTapped(key.id))) {
-            $0.player = PlayerDetailFeature.State(player: key, clubName: opponentName)
+            $0.player = PlayerDetailFeature.State(player: key, clubName: opponent.name, clubID: opponent.id)
         }
         #expect(store.state.player?.player.id == key.id)
         await store.send(.player(.dismiss)) {
@@ -384,6 +384,99 @@ struct MatchweekFeatureTests {
         state.weekIndex = 36
         #expect(state.weekNumber == 37)
         #expect(state.advanceWeekTitle == "Advance to week 38")
+    }
+
+    @Test func weekPagingStopsAtTheEnds() async {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "norwich-city", season: season)) {
+            MatchweekFeature()
+        }
+        await store.send(.view(.previousWeekButtonTapped))
+        await store.send(.view(.nextWeekButtonTapped)) {
+            $0.browsedWeekIndex = 1
+        }
+        await store.send(.view(.previousWeekButtonTapped)) {
+            $0.browsedWeekIndex = 0
+        }
+        await store.send(.view(.previousWeekButtonTapped))
+
+        var last = MatchweekFeature.State(userClubID: "norwich-city", season: season)
+        last.browsedWeekIndex = last.weeks.count - 1
+        let end = TestStore(initialState: last) {
+            MatchweekFeature()
+        }
+        await end.send(.view(.nextWeekButtonTapped))
+        #expect(end.state.weekIndex == 0)
+        #expect(end.state.shownWeekIndex == last.weeks.count - 1)
+    }
+
+    @Test func theWeekScreenPagesPastResultsAndFutureFixtures() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 7 }
+        }
+        store.exhaustivity = .off
+
+        #expect(store.state.browsedWeekIndex == nil)
+        #expect(store.state.shownWeekIndex == 0)
+        #expect(store.state.browsedWeekHasResults == false)
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore == nil })
+
+        await store.send(.view(.nextWeekButtonTapped))
+        #expect(store.state.weekIndex == 0)
+        #expect(store.state.pending == nil)
+        #expect(store.state.shownWeekIndex == 1)
+        #expect(store.state.browsedWeekHasResults == false)
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore == nil })
+        let future = Set(store.state.weeks[1].map { "\($0.homeID)-\($0.awayID)" })
+        #expect(Set(store.state.weekLines.map(\.id)) == future)
+
+        await store.send(.view(.previousWeekButtonTapped))
+        #expect(store.state.shownWeekIndex == 0)
+        #expect(store.state.weekIndex == 0)
+
+        await store.send(.view(.simulateMatchButtonTapped))
+        await store.finish()
+        let played = try #require(store.state.playedWeeks.first)
+        #expect(played.count == 10)
+        #expect(store.state.browsedWeekHasResults)
+        #expect(store.state.weekIndex == 0)
+        let standings = store.state.standings
+
+        await store.send(.view(.nextFixtureButtonTapped))
+        await store.finish()
+        #expect(store.state.weekIndex == 1)
+        #expect(store.state.browsedWeekIndex == nil)
+        #expect(store.state.shownWeekIndex == 1)
+        #expect(store.state.pending == nil)
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore == nil })
+        #expect(store.state.standings == standings)
+
+        await store.send(.view(.previousWeekButtonTapped))
+        #expect(store.state.weekIndex == 1)
+        #expect(store.state.pending == nil)
+        #expect(store.state.standings == standings)
+        #expect(store.state.shownWeekIndex == 0)
+        #expect(store.state.browsedWeekHasResults)
+        let byID = Dictionary(uniqueKeysWithValues: played.map { ($0.id, $0) })
+        #expect(store.state.weekLines.count == played.count)
+        for line in store.state.weekLines {
+            let score = try #require(byID[line.id])
+            #expect(line.homeScore == score.homeScore)
+            #expect(line.awayScore == score.awayScore)
+        }
+
+        await store.send(.view(.nextWeekButtonTapped))
+        await store.send(.view(.nextWeekButtonTapped))
+        #expect(store.state.weekIndex == 1)
+        #expect(store.state.shownWeekIndex == 2)
+        #expect(store.state.browsedWeekHasResults == false)
+        #expect(store.state.weekLines.allSatisfy { $0.homeScore == nil })
+        let later = Set(store.state.weeks[2].map { "\($0.homeID)-\($0.awayID)" })
+        #expect(Set(store.state.weekLines.map(\.id)) == later)
+        #expect(store.state.standings == standings)
     }
 
     @Test func aPlayedMatchListsTheUserClubScorersThenTheOpponent() throws {
@@ -453,7 +546,7 @@ struct MatchweekFeatureTests {
         let leader = try #require(goals.first)
         await store.send(.view(.leadersButtonTapped))
         await store.send(.leaders(.presented(.view(.playerTapped(leader.player.id)))))
-        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player, clubName: leader.clubName))
+        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player, clubName: leader.clubName, clubID: leader.clubID))
 
         let frozen = (goals, assists, saves)
         await store.send(.view(.replayButtonTapped))
@@ -530,7 +623,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.championship?.record == record)
         #expect(store.state.championship?.goals.map(\.player.id) == store.state.goalLeaders.filter { $0.clubID == championID }.map(\.player.id))
         await store.send(.championship(.presented(.view(.awardTapped(.goldenBoot)))))
-        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player, clubName: boot.clubName))
+        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player, clubName: boot.clubName, clubID: boot.clubID))
         #expect(store.state.championship?.userClubID == "manchester-city")
 
         await store.send(.view(.replayButtonTapped))
@@ -647,6 +740,10 @@ struct MatchweekFeatureTests {
         #expect(store.state.seasonAlert == nil)
         #expect(store.state.seasonIsOver)
         #expect(store.state.weekIndex == 37)
+        #expect(store.state.playedWeeks.count == 38)
+        #expect(store.state.browsedWeekIndex == nil)
+        #expect(store.state.shownWeekIndex == 37)
+        #expect(store.state.browsedWeekHasResults)
         #expect(store.state.hasNextFixture == false)
         #expect(store.state.highlight == nil)
         #expect(store.state.stats == nil)
@@ -689,7 +786,7 @@ struct MatchweekFeatureTests {
         }
         let cityPlayer = try #require(city.starters.first)
         await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
-            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name)
+            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name, clubID: city.id)
         }
         await store.send(.team(.presented(.player(.dismiss)))) {
             $0.team?.player = nil

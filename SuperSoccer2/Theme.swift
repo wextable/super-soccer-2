@@ -131,6 +131,10 @@ extension Theme {
         var shadowY: CGFloat
         var emptyMinHeight: CGFloat
         var ballMinimum: CGFloat
+        /// Crest beside a club name in a row.
+        var crest: CGFloat
+        /// Crest beside a club name in a title.
+        var crestMark: CGFloat
 
         static let starbyte = Metrics(
             minimumControl: 44,
@@ -145,7 +149,9 @@ extension Theme {
             shadowRadius: 2,
             shadowY: 1,
             emptyMinHeight: 220,
-            ballMinimum: 10
+            ballMinimum: 10,
+            crest: 28,
+            crestMark: 44
         )
     }
 }

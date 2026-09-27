@@ -82,13 +82,19 @@ struct MatchStatsView: View {
                 Text(row.name)
                     .font(theme.type.playerName)
                     .foregroundStyle(theme.colors.text.color)
-                Text(row.club)
-                    .font(theme.type.captionNumber)
-                    .foregroundStyle(theme.colors.secondaryText.color)
-                if let assist = row.assist, let club = row.assistClub {
-                    Text("\(assist) · \(club)")
+                HStack(spacing: theme.space.xs) {
+                    ClubCrest(clubID: row.clubID)
+                    Text(row.club)
                         .font(theme.type.captionNumber)
                         .foregroundStyle(theme.colors.secondaryText.color)
+                }
+                if let assist = row.assist, let club = row.assistClub {
+                    HStack(spacing: theme.space.xs) {
+                        ClubCrest(clubID: row.assistClubID ?? "")
+                        Text("\(assist) · \(club)")
+                            .font(theme.type.captionNumber)
+                            .foregroundStyle(theme.colors.secondaryText.color)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
