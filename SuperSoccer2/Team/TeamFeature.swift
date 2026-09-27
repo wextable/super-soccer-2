@@ -7,16 +7,22 @@ struct TeamFeature {
     @ObservableState
     struct State: Equatable {
         var club: Club
-        var played: Int
+        var won: Int
+        var lost: Int
+        var drawn: Int
         var points: Int
         var goalDifference: Int
-        /// The user’s own club can rest a starter. Another club’s row cannot.
+        /// Table place once this club has played. Hidden before that.
+        var place: Int? = nil
+        /// The user’s own club can change the lineup. Another club’s row cannot.
         var canManage: Bool = false
+        @Presents var substitution: SubstitutionFeature.State?
         @Presents var player: PlayerDetailFeature.State?
     }
 
     enum Action {
         case view(View)
+        case substitution(PresentationAction<SubstitutionFeature.Action>)
         case player(PresentationAction<PlayerDetailFeature.Action>)
         case delegate(Delegate)
 
@@ -24,6 +30,7 @@ struct TeamFeature {
         enum View {
             case playerTapped(Player.ID)
             case restStarter(Player.ID)
+            case playBench(Player.ID)
         }
 
         @CasePathable
@@ -37,36 +44,49 @@ struct TeamFeature {
             switch action {
             case let .view(.playerTapped(id)):
                 guard let player = state.club.players.first(where: { $0.id == id }) else { return .none }
-                state.player = detail(for: player, in: state)
+                state.player = PlayerDetailFeature.State(player: player, clubName: state.club.name)
                 return .none
 
             case let .view(.restStarter(id)):
-                guard let starter = state.club.players.first(where: { $0.id == id }),
-                      let incoming = WeekBetween.bestFit(replacing: starter, in: state.club.players)
-                else { return .none }
-                return .send(.delegate(.replace(outgoing: id, incoming: incoming.id)))
+                return present(.rest, playerID: id, in: &state)
 
-            case let .player(.presented(.delegate(.replace(incoming)))):
-                guard let outgoing = state.player?.player.id else { return .none }
-                return .send(.delegate(.replace(outgoing: outgoing, incoming: incoming)))
+            case let .view(.playBench(id)):
+                return present(.play, playerID: id, in: &state)
 
-            case .player, .delegate:
+            case let .substitution(.presented(.delegate(.chosen(id)))):
+                guard let swap = state.substitution?.swap(chosenID: id) else {
+                    state.substitution = nil
+                    return .none
+                }
+                state.substitution = nil
+                return .send(.delegate(.replace(outgoing: swap.outgoing, incoming: swap.incoming)))
+
+            case .substitution(.presented(.delegate(.cancelled))), .substitution(.dismiss):
+                state.substitution = nil
+                return .none
+
+            case .substitution, .player, .delegate:
                 return .none
             }
+        }
+        .ifLet(\.$substitution, action: \.substitution) {
+            SubstitutionFeature()
         }
         .ifLet(\.$player, action: \.player) {
             PlayerDetailFeature()
         }
     }
 
-    private func detail(for player: Player, in state: State) -> PlayerDetailFeature.State {
-        let manages = state.canManage && player.isStarter && player.injury == nil
-        return PlayerDetailFeature.State(
-            player: player,
-            clubName: state.club.name,
-            canManage: manages,
-            bestFit: manages ? WeekBetween.bestFit(replacing: player, in: state.club.players) : nil,
-            alternatives: manages ? WeekBetween.alternatives(replacing: player, in: state.club.players) : []
-        )
+    private func present(
+        _ kind: SubstitutionFeature.State.Kind,
+        playerID: Player.ID,
+        in state: inout State
+    ) -> Effect<Action> {
+        guard state.canManage, state.substitution == nil,
+              let player = state.club.players.first(where: { $0.id == playerID }),
+              let prompt = SubstitutionFeature.State.make(kind, player: player, in: state.club.players)
+        else { return .none }
+        state.substitution = prompt
+        return .none
     }
 }

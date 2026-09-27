@@ -10,7 +10,6 @@ struct SkillChoiceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
-                ratings
                 choices
             }
             .padding(theme.space.lg)
@@ -45,62 +44,50 @@ struct SkillChoiceView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var ratings: some View {
-        VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text("Ratings")
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            WeekCard {
-                ForEach(Array(PlayerStat.allCases.enumerated()), id: \.element) { index, stat in
-                    ratingRow(stat, isLast: index == PlayerStat.allCases.count - 1)
-                }
+    private var choices: some View {
+        WeekCard {
+            ForEach(Array(store.choices.enumerated()), id: \.element.id) { index, choice in
+                statRow(choice, isLast: index == store.choices.count - 1)
             }
         }
     }
 
-    private func ratingRow(_ stat: PlayerStat, isLast: Bool) -> some View {
-        let value = store.player.ratings.value(for: stat)
+    private func statRow(_ choice: SkillChoice, isLast: Bool) -> some View {
+        let projection = SkillProjection.make(
+            current: store.player.ratings.value(for: choice.stat),
+            boost: choice.points
+        )
         return VStack(spacing: 0) {
-            HStack {
-                Text(stat.label)
-                    .font(theme.type.playerName)
-                    .foregroundStyle(theme.colors.text.color)
-                Spacer()
-                Text("\(value)")
-                    .font(theme.type.playerOverall)
-                    .foregroundStyle(theme.colors.text.color)
+            Button {
+                store.send(.view(.statTapped(choice.stat)))
+            } label: {
+                HStack(spacing: theme.space.sm) {
+                    Text(choice.stat.label)
+                        .font(theme.type.playerName)
+                        .foregroundStyle(theme.colors.text.color)
+                    RatingBar(track: .growth(projection), mark: .growth)
+                        .frame(maxWidth: .infinity)
+                    Text(projection.reading)
+                        .font(theme.type.playerOverall)
+                        .foregroundStyle(theme.colors.text.color)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
             }
-            .frame(minHeight: theme.metrics.minimumControl)
+            .buttonStyle(.plain)
+            .disabled(!projection.available)
+            .opacity(projection.available ? 1 : 0.4)
+            .accessibilityLabel(choiceLabel(choice.stat, projection))
             if !isLast {
                 WeekHairline()
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(stat.label) \(value)")
     }
 
-    private var choices: some View {
-        WeekCard {
-            ForEach(Array(store.choices.enumerated()), id: \.element.id) { index, choice in
-                Button {
-                    store.send(.view(.statTapped(choice.stat)))
-                } label: {
-                    HStack {
-                        Text(choice.stat.label)
-                            .font(theme.type.playerName)
-                        Spacer()
-                        Text("+\(choice.points)")
-                            .font(theme.type.playerOverall)
-                    }
-                    .foregroundStyle(theme.colors.text.color)
-                    .frame(minHeight: theme.metrics.minimumControl)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(choice.stat.label), plus \(choice.points), for \(store.player.fullName)")
-                if index < store.choices.count - 1 {
-                    WeekHairline()
-                }
-            }
+    private func choiceLabel(_ stat: PlayerStat, _ projection: SkillProjection) -> String {
+        if projection.available {
+            return "\(stat.label), \(projection.current) to \(projection.next), for \(store.player.fullName)"
         }
+        return "\(stat.label), \(projection.current), cannot increase, for \(store.player.fullName)"
     }
 }

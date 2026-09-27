@@ -9,9 +9,6 @@ struct PlayerDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
-                if store.canManage, let bestFit = store.bestFit {
-                    swap(bestFit)
-                }
                 ratings
             }
             .padding(theme.space.lg)
@@ -48,87 +45,26 @@ struct PlayerDetailView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func swap(_ bestFit: Player) -> some View {
-        VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text("Bring in")
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            Button {
-                store.send(.view(.bestFitTapped))
-            } label: {
-                VStack(spacing: theme.space.xxs) {
-                    Text("Rest, bring in \(bestFit.fullName)")
-                    Text("\(bestFit.overall) · \(bestFit.fitnessBand().label) \(bestFit.condition)")
-                        .font(theme.type.captionNumber)
-                }
-            }
-            .buttonStyle(ThemeActionButtonStyle())
-            .accessibilityLabel(
-                "Rest \(store.player.fullName) and bring in \(bestFit.fullName), overall \(bestFit.overall), \(bestFit.fitnessBand().label), fitness \(bestFit.condition)"
-            )
-            if !store.alternatives.isEmpty {
-                Text("Or someone else")
-                    .font(theme.type.eyebrow)
-                    .foregroundStyle(theme.colors.secondaryText.color)
-                WeekCard {
-                    ForEach(Array(store.alternatives.enumerated()), id: \.element.id) { index, player in
-                        Button {
-                            store.send(.view(.alternativeTapped(player.id)))
-                        } label: {
-                            HStack(spacing: theme.space.sm) {
-                                Circle()
-                                    .fill(theme.colors.fitness(player.fitnessBand()))
-                                    .frame(width: theme.space.sm, height: theme.space.sm)
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: theme.space.xxs) {
-                                    Text(player.fullName)
-                                        .font(theme.type.playerName)
-                                        .foregroundStyle(theme.colors.text.color)
-                                    Text("\(player.fitnessBand().label) · \(player.condition)")
-                                        .font(theme.type.captionNumber)
-                                        .foregroundStyle(theme.colors.fitness(player.fitnessBand()))
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                Text("\(player.overall)")
-                                    .font(theme.type.playerOverall)
-                                    .foregroundStyle(theme.colors.text.color)
-                            }
-                            .frame(minHeight: theme.metrics.minimumControl)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            "Bring in \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
-                        )
-                        if index < store.alternatives.count - 1 {
-                            WeekHairline()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private var ratings: some View {
         WeekCard {
-            ratingRow("Speed", store.player.ratings.speed, isLast: false)
-            ratingRow("Shooting", store.player.ratings.shooting, isLast: false)
-            ratingRow("Passing", store.player.ratings.passing, isLast: false)
-            ratingRow("Dribbling", store.player.ratings.dribbling, isLast: false)
-            ratingRow("Defending", store.player.ratings.defending, isLast: false)
-            ratingRow("Goalkeeping", store.player.ratings.goalkeeping, isLast: true)
+            ForEach(Array(PlayerStat.allCases.enumerated()), id: \.element) { index, stat in
+                ratingRow(stat, isLast: index == PlayerStat.allCases.count - 1)
+            }
         }
     }
 
-    private func ratingRow(_ name: String, _ value: Int, isLast: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(name)
+    private func ratingRow(_ stat: PlayerStat, isLast: Bool) -> some View {
+        let full = store.player.ratings.value(for: stat)
+        let current = store.player.playingRating(stat)
+        let degraded = current != full
+        return VStack(spacing: 0) {
+            HStack(spacing: theme.space.sm) {
+                Text(stat.label)
                     .font(theme.type.playerName)
                     .foregroundStyle(theme.colors.text.color)
-                Spacer()
-                Text("\(value)")
-                    .font(theme.type.playerOverall)
-                    .foregroundStyle(theme.colors.text.color)
+                RatingBar(track: .fitness(full: full, current: current), mark: .condition)
+                    .frame(maxWidth: .infinity)
+                FitnessNumber(current: current, full: full, showsFull: degraded)
             }
             .frame(minHeight: theme.metrics.minimumControl)
             if !isLast {
@@ -136,7 +72,14 @@ struct PlayerDetailView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name) \(value)")
+        .accessibilityLabel(ratingLabel(stat.label, current: current, full: full, degraded: degraded))
+    }
+
+    private func ratingLabel(_ name: String, current: Int, full: Int, degraded: Bool) -> String {
+        if degraded {
+            return "\(name) \(current), full fitness \(full)"
+        }
+        return "\(name) \(current)"
     }
 
     private var fitnessLine: String {

@@ -241,6 +241,10 @@ struct WeekBetweenFeatureTests {
         let starter = try #require(club.starters.first { WeekBetween.bestFit(replacing: $0, in: club.players) != nil })
         let incoming = try #require(WeekBetween.bestFit(replacing: starter, in: club.players))
         await store.send(.view(.restStarter(starter.id)))
+        #expect(store.state.substitution?.suggestion.id == incoming.id)
+        #expect(store.state.userClub?.starters.contains { $0.id == starter.id } == true)
+        await store.send(.substitution(.presented(.view(.suggestionTapped))))
+        await store.skipReceivedActions()
         let after = try #require(store.state.userClub)
         #expect(after.starters.contains { $0.id == starter.id } == false)
         #expect(after.starters.contains { $0.id == incoming.id })
@@ -329,6 +333,29 @@ struct WeekBetweenFeatureTests {
         #expect(store.state.championship?.record.championClubID == "manchester-city")
         let updated = try #require(store.state.userClub?.players.first { $0.id == player.id })
         #expect(updated.ratings.passing == player.ratings.passing + WeekTuning.current.skillPointsPassing)
+    }
+
+    @Test func playingABenchPlayerWaitsForWhoTheyReplace() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+
+        let club = try #require(store.state.userClub)
+        let bench = try #require(club.bench.first { WeekBetween.starterToSit(for: $0, in: club.players) != nil })
+        let sitting = try #require(WeekBetween.starterToSit(for: bench, in: club.players))
+        await store.send(.view(.playBench(bench.id)))
+        #expect(store.state.substitution?.heading == "Replace")
+        #expect(store.state.substitution?.suggestion.id == sitting.id)
+        #expect(store.state.userClub?.starters.contains { $0.id == bench.id } == false)
+
+        await store.send(.substitution(.presented(.view(.suggestionTapped))))
+        await store.skipReceivedActions()
+        let after = try #require(store.state.userClub)
+        #expect(after.starters.contains { $0.id == bench.id })
+        #expect(after.starters.contains { $0.id == sitting.id } == false)
+        #expect(store.state.substitution == nil)
     }
 }
 

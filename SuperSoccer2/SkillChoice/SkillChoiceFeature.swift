@@ -34,7 +34,12 @@ struct SkillChoiceFeature {
         Reduce<State, Action> { state, action in
             switch action {
             case let .view(.statTapped(stat)):
-                guard state.choices.contains(where: { $0.stat == stat }) else { return .none }
+                guard let choice = state.choices.first(where: { $0.stat == stat }) else { return .none }
+                let projection = SkillProjection.make(
+                    current: state.player.ratings.value(for: stat),
+                    boost: choice.points
+                )
+                guard projection.available else { return .none }
                 return .send(.delegate(.chose(stat)))
 
             case .delegate:

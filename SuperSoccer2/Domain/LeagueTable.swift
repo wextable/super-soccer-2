@@ -78,6 +78,18 @@ enum LeagueTable {
         return standings.map { rows[$0.clubID] ?? $0 }
     }
 
+    /// `1st`, `2nd`, `3rd`, `4th`, with the teens staying `11th`.
+    static func placeWord(_ place: Int) -> String {
+        let tens = place % 100
+        if (11...13).contains(tens) { return "\(place)th" }
+        switch place % 10 {
+        case 1: return "\(place)st"
+        case 2: return "\(place)nd"
+        case 3: return "\(place)rd"
+        default: return "\(place)th"
+        }
+    }
+
     /// Points, then goal difference, then the club's overall. A remaining tie keeps the earlier row.
     static func ranked(_ standings: [Standing], clubs: [Club]) -> [Standing] {
         let overall = Dictionary(uniqueKeysWithValues: clubs.map { ($0.id, $0.overall) })

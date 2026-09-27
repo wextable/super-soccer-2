@@ -101,6 +101,16 @@ struct LeagueTableTests {
         for row in next {
             #expect(row.won + row.drawn + row.lost == row.played)
         }
+        #expect(LeagueTable.placeWord(1) == "1st")
+        #expect(LeagueTable.placeWord(2) == "2nd")
+        #expect(LeagueTable.placeWord(3) == "3rd")
+        #expect(LeagueTable.placeWord(4) == "4th")
+        #expect(LeagueTable.placeWord(11) == "11th")
+        #expect(LeagueTable.placeWord(12) == "12th")
+        #expect(LeagueTable.placeWord(13) == "13th")
+        #expect(LeagueTable.placeWord(21) == "21st")
+        #expect(LeagueTable.placeWord(22) == "22nd")
+        #expect(LeagueTable.placeWord(23) == "23rd")
     }
 
     @Test func rankUsesPointsThenGoalDifferenceThenOverall() throws {
@@ -638,17 +648,19 @@ struct MatchweekFeatureTests {
         let other = try #require(store.state.clubs.first { $0.id != city.id })
 
         await store.send(.view(.teamButtonTapped(city.id))) {
-            $0.team = TeamFeature.State(club: city, played: 0, points: 0, goalDifference: 0, canManage: true)
+            $0.team = TeamFeature.State(
+                club: city,
+                won: 0,
+                lost: 0,
+                drawn: 0,
+                points: 0,
+                goalDifference: 0,
+                canManage: true
+            )
         }
         let cityPlayer = try #require(city.starters.first)
         await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
-            $0.team?.player = PlayerDetailFeature.State(
-                player: cityPlayer,
-                clubName: city.name,
-                canManage: true,
-                bestFit: WeekBetween.bestFit(replacing: cityPlayer, in: city.players),
-                alternatives: WeekBetween.alternatives(replacing: cityPlayer, in: city.players)
-            )
+            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name)
         }
         await store.send(.team(.presented(.player(.dismiss)))) {
             $0.team?.player = nil
@@ -658,11 +670,36 @@ struct MatchweekFeatureTests {
         }
 
         await store.send(.view(.teamButtonTapped(other.id))) {
-            $0.team = TeamFeature.State(club: other, played: 0, points: 0, goalDifference: 0)
+            $0.team = TeamFeature.State(club: other, won: 0, lost: 0, drawn: 0, points: 0, goalDifference: 0)
         }
         #expect(store.state.team?.club.name == other.name)
         await store.send(.view(.teamButtonTapped("missing")))
         #expect(store.state.team?.club.id == other.id)
+    }
+
+    @Test func aPlayedClubCarriesItsPlaceAndRecord() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
+            MatchweekFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 9 }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.simulateMatchButtonTapped))
+        await store.finish()
+        let club = try #require(store.state.userClub)
+        await store.send(.view(.teamButtonTapped(club.id)))
+        let team = try #require(store.state.team)
+        let standing = try #require(store.state.userStanding)
+        #expect(team.won == standing.won)
+        #expect(team.lost == standing.lost)
+        #expect(team.drawn == standing.drawn)
+        #expect(team.won + team.lost + team.drawn == standing.played)
+        #expect(standing.played == 1)
+        #expect(team.place == store.state.places[club.id])
+        #expect(team.points == standing.points)
+        #expect(team.goalDifference == standing.goalDifference)
     }
 }
 

@@ -32,6 +32,8 @@ struct MatchweekFeature {
         @Presents var championship: ChampionshipFeature.State?
         @Presents var team: TeamFeature.State?
         @Presents var player: PlayerDetailFeature.State?
+        /// Rest or Play opened from the Club tab. The table’s club screen keeps its own.
+        @Presents var substitution: SubstitutionFeature.State?
         @Presents var seasonAlert: AlertState<Action.SeasonAlert>?
 
         enum Tab: Equatable, Hashable, Sendable, CaseIterable {
@@ -80,6 +82,7 @@ struct MatchweekFeature {
             championship = nil
             team = nil
             player = nil
+            substitution = nil
             seasonAlert = nil
         }
 
@@ -308,13 +311,21 @@ struct MatchweekFeature {
         }
 
         func playerDetail(for player: Player, in club: Club) -> PlayerDetailFeature.State {
-            let manages = club.id == userClubID && player.isStarter && player.injury == nil
-            return PlayerDetailFeature.State(
-                player: player,
-                clubName: club.name,
-                canManage: manages,
-                bestFit: manages ? WeekBetween.bestFit(replacing: player, in: club.players) : nil,
-                alternatives: manages ? WeekBetween.alternatives(replacing: player, in: club.players) : []
+            PlayerDetailFeature.State(player: player, clubName: club.name)
+        }
+
+        func teamScreen(for club: Club) -> TeamFeature.State {
+            let standing = standings.first { $0.clubID == club.id }
+            let played = standing?.played ?? 0
+            return TeamFeature.State(
+                club: club,
+                won: standing?.won ?? 0,
+                lost: standing?.lost ?? 0,
+                drawn: standing?.drawn ?? 0,
+                points: standing?.points ?? 0,
+                goalDifference: standing?.goalDifference ?? 0,
+                place: played > 0 ? places[club.id] : nil,
+                canManage: club.id == userClubID
             )
         }
     }
@@ -327,6 +338,7 @@ struct MatchweekFeature {
         case championship(PresentationAction<ChampionshipFeature.Action>)
         case team(PresentationAction<TeamFeature.Action>)
         case player(PresentationAction<PlayerDetailFeature.Action>)
+        case substitution(PresentationAction<SubstitutionFeature.Action>)
         case skillChoice(PresentationAction<SkillChoiceFeature.Action>)
         case seasonAlert(PresentationAction<SeasonAlert>)
 
@@ -343,6 +355,7 @@ struct MatchweekFeature {
             case teamButtonTapped(String)
             case playerTapped(Player.ID)
             case restStarter(Player.ID)
+            case playBench(Player.ID)
         }
 
         @CasePathable
@@ -436,14 +449,7 @@ struct MatchweekFeature {
 
             case let .view(.teamButtonTapped(id)):
                 guard let club = state.clubs.first(where: { $0.id == id }) else { return .none }
-                let standing = state.standings.first { $0.clubID == id }
-                state.team = TeamFeature.State(
-                    club: club,
-                    played: standing?.played ?? 0,
-                    points: standing?.points ?? 0,
-                    goalDifference: standing?.goalDifference ?? 0,
-                    canManage: id == state.userClubID
-                )
+                state.team = state.teamScreen(for: club)
                 return .none
 
             case let .view(.playerTapped(id)):
@@ -452,8 +458,25 @@ struct MatchweekFeature {
                 return .none
 
             case let .view(.restStarter(id)):
-                guard rest(id, in: &state) else { return .none }
+                presentLineup(.rest, playerID: id, in: &state)
+                return .none
+
+            case let .view(.playBench(id)):
+                presentLineup(.play, playerID: id, in: &state)
+                return .none
+
+            case let .substitution(.presented(.delegate(.chosen(id)))):
+                guard let swap = state.substitution?.swap(chosenID: id) else {
+                    state.substitution = nil
+                    return .none
+                }
+                state.substitution = nil
+                guard replace(swap.outgoing, with: swap.incoming, in: &state) else { return .none }
                 return save(state)
+
+            case .substitution(.presented(.delegate(.cancelled))), .substitution(.dismiss):
+                state.substitution = nil
+                return .none
 
             case let .skillChoice(.presented(.delegate(.chose(stat)))):
                 guard let offerID = state.skillChoice?.offerID else { return .none }
@@ -517,12 +540,7 @@ struct MatchweekFeature {
                 guard replace(outgoing, with: incoming, in: &state) else { return .none }
                 return save(state)
 
-            case let .player(.presented(.delegate(.replace(incoming)))):
-                guard let outgoing = state.player?.player.id else { return .none }
-                guard replace(outgoing, with: incoming, in: &state) else { return .none }
-                return save(state)
-
-            case .stats, .leaders, .championship, .team, .player:
+            case .stats, .leaders, .championship, .team, .player, .substitution:
                 return .none
             }
         }
@@ -543,6 +561,9 @@ struct MatchweekFeature {
         }
         .ifLet(\.$player, action: \.player) {
             PlayerDetailFeature()
+        }
+        .ifLet(\.$substitution, action: \.substitution) {
+            SubstitutionFeature()
         }
         .ifLet(\.$skillChoice, action: \.skillChoice) {
             SkillChoiceFeature()
@@ -578,6 +599,7 @@ struct MatchweekFeature {
         state.championship = nil
         state.team = nil
         state.player = nil
+        state.substitution = nil
         state.skillChoice = nil
         state.skillFollowUp = nil
         state.seasonAlert = nil
@@ -617,6 +639,7 @@ struct MatchweekFeature {
         state.championship = nil
         state.team = nil
         state.player = nil
+        state.substitution = nil
         state.didFail = false
     }
 
@@ -635,12 +658,17 @@ struct MatchweekFeature {
         )
     }
 
-    private func rest(_ id: Player.ID, in state: inout State) -> Bool {
-        guard let club = state.clubs.first(where: { $0.id == state.userClubID }),
-              let starter = club.players.first(where: { $0.id == id }),
-              let incoming = WeekBetween.bestFit(replacing: starter, in: club.players)
-        else { return false }
-        return replace(id, with: incoming.id, in: &state)
+    private func presentLineup(
+        _ kind: SubstitutionFeature.State.Kind,
+        playerID: Player.ID,
+        in state: inout State
+    ) {
+        guard state.substitution == nil,
+              let club = state.userClub,
+              let player = club.players.first(where: { $0.id == playerID }),
+              let prompt = SubstitutionFeature.State.make(kind, player: player, in: club.players)
+        else { return }
+        state.substitution = prompt
     }
 
     private func replace(_ outgoingID: Player.ID, with incomingID: Player.ID, in state: inout State) -> Bool {
@@ -650,7 +678,9 @@ struct MatchweekFeature {
         state.clubs[index] = updated
         state.lineupRevision += 1
         state.player = nil
+        state.substitution = nil
         state.team?.player = nil
+        state.team?.substitution = nil
         refreshPresented(&state)
         return true
     }
@@ -663,9 +693,16 @@ struct MatchweekFeature {
     }
 
     private func refreshPresented(_ state: inout State) {
-        if let teamID = state.team?.club.id,
-           let club = state.clubs.first(where: { $0.id == teamID }) {
-            state.team?.club = club
-        }
+        guard let teamID = state.team?.club.id,
+              let club = state.clubs.first(where: { $0.id == teamID })
+        else { return }
+        let screen = state.teamScreen(for: club)
+        state.team?.club = screen.club
+        state.team?.won = screen.won
+        state.team?.lost = screen.lost
+        state.team?.drawn = screen.drawn
+        state.team?.points = screen.points
+        state.team?.goalDifference = screen.goalDifference
+        state.team?.place = screen.place
     }
 }

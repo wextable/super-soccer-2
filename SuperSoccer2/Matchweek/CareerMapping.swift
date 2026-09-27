@@ -45,6 +45,7 @@ extension MatchweekFeature.State {
         championship = nil
         team = nil
         player = nil
+        substitution = nil
         seasonAlert = nil
     }
 }

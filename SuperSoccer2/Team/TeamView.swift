@@ -7,12 +7,16 @@ struct TeamView: View {
     var body: some View {
         TeamScreen(
             club: store.club,
-            played: store.played,
+            won: store.won,
+            lost: store.lost,
+            drawn: store.drawn,
             points: store.points,
             goalDifference: store.goalDifference,
+            place: store.place,
             canManage: store.canManage,
             onPlayer: { store.send(.view(.playerTapped($0))) },
-            onRest: store.canManage ? { store.send(.view(.restStarter($0))) } : nil
+            onRest: store.canManage ? { store.send(.view(.restStarter($0))) } : nil,
+            onPlay: store.canManage ? { store.send(.view(.playBench($0))) } : nil
         )
         .navigationTitle(store.club.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -20,6 +24,9 @@ struct TeamView: View {
             item: $store.scope(state: \.player, action: \.player)
         ) { playerStore in
             PlayerDetailView(store: playerStore)
+        }
+        .sheet(item: $store.scope(state: \.substitution, action: \.substitution)) { substitutionStore in
+            SubstitutionView(store: substitutionStore)
         }
     }
 }
@@ -29,12 +36,16 @@ struct TeamScreen: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var club: Club
-    var played: Int
+    var won: Int
+    var lost: Int
+    var drawn: Int
     var points: Int
     var goalDifference: Int
+    var place: Int?
     var canManage: Bool = false
     var onPlayer: (Player.ID) -> Void
     var onRest: ((Player.ID) -> Void)? = nil
+    var onPlay: ((Player.ID) -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -44,8 +55,8 @@ struct TeamScreen: View {
                 if !club.injuryLines.isEmpty {
                     injuries
                 }
-                roster(title: "Starting", players: club.starters, canRest: canManage)
-                roster(title: "Bench", players: club.bench, canRest: false)
+                roster(title: "Starting", players: club.starters)
+                roster(title: "Bench", players: club.bench)
             }
             .padding(theme.space.lg)
             .readingWidth()
@@ -59,29 +70,32 @@ struct TeamScreen: View {
             Text(club.name)
                 .font(theme.type.display)
                 .foregroundStyle(theme.colors.text.color)
-            Text("Overall \(club.overall)")
+            if let place {
+                Text("\(LeagueTable.placeWord(place)) in the table")
+                    .font(theme.type.homeLine)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+            }
+            Text("Overall \(club.overall)  ·  Attack \(club.attack)  ·  Defense \(club.defense)")
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)
-            Text("Attack \(club.attack)")
-                .font(theme.type.homeLine)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            Text("Defense \(club.defense)")
-                .font(theme.type.homeLine)
-                .foregroundStyle(theme.colors.secondaryText.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .combine)
     }
 
     private var record: some View {
         WeekCard {
-            recordRow("Played", value: "\(played)")
+            recordRow("W/L/D", value: "\(won)/\(lost)/\(drawn)")
             WeekHairline()
             recordRow("Points", value: "\(points)")
             WeekHairline()
             recordRow("Goal difference", value: signedGoalDifference(goalDifference))
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Played \(played), \(points) points, goal difference \(signedGoalDifference(goalDifference))")
+        .accessibilityLabel(
+            "\(won) wins, \(lost) losses, \(drawn) draws, \(points) points, goal difference \(signedGoalDifference(goalDifference))"
+        )
     }
 
     private func recordRow(_ label: String, value: String) -> some View {
@@ -123,7 +137,7 @@ struct TeamScreen: View {
         }
     }
 
-    private func roster(title: String, players: [Player], canRest: Bool) -> some View {
+    private func roster(title: String, players: [Player]) -> some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
             Text(title)
                 .font(theme.type.eyebrow)
@@ -135,7 +149,7 @@ struct TeamScreen: View {
             } else {
                 WeekCard {
                     ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
-                        playerRow(player, canRest: canRest)
+                        playerRow(player)
                         if index < players.count - 1 {
                             WeekHairline()
                         }
@@ -145,10 +159,17 @@ struct TeamScreen: View {
         }
     }
 
-    private func playerRow(_ player: Player, canRest: Bool) -> some View {
+    private func playerRow(_ player: Player) -> some View {
         let band = player.fitnessBand()
         let mark = player.injury == nil ? band.label : "Out"
-        let showRest = canRest && player.injury == nil && WeekBetween.bestFit(replacing: player, in: club.players) != nil
+        let showRest = onRest != nil
+            && player.isStarter
+            && player.injury == nil
+            && WeekBetween.bestFit(replacing: player, in: club.players) != nil
+        let showPlay = onPlay != nil
+            && !player.isStarter
+            && player.injury == nil
+            && WeekBetween.starterToSit(for: player, in: club.players) != nil
         return HStack(spacing: theme.space.sm) {
             Button {
                 onPlayer(player.id)
@@ -183,15 +204,19 @@ struct TeamScreen: View {
                 .font(theme.type.button)
                 .foregroundStyle(theme.colors.action.color)
                 .frame(minHeight: theme.metrics.minimumControl)
-                .accessibilityLabel(restLabel(for: player))
+                .accessibilityLabel("Rest \(player.fullName)")
+            }
+            if showPlay {
+                Button("Play") {
+                    onPlay?(player.id)
+                }
+                .font(theme.type.button)
+                .foregroundStyle(theme.colors.action.color)
+                .frame(minHeight: theme.metrics.minimumControl)
+                .accessibilityLabel("Play \(player.fullName)")
             }
         }
         .frame(minHeight: theme.metrics.minimumControl)
-    }
-
-    private func restLabel(for player: Player) -> String {
-        let incoming = WeekBetween.bestFit(replacing: player, in: club.players)?.fullName ?? "a teammate"
-        return "Rest \(player.fullName) and bring in \(incoming)"
     }
 
     private func playerLabel(_ player: Player, mark: String) -> String {
