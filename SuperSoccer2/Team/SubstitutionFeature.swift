@@ -8,36 +8,18 @@ struct SubstitutionFeature {
     struct State: Equatable {
         var kind: Kind
         var subject: Player
-        var suggestion: Player
-        var others: [Player]
+        /// The obvious swap leads. Everyone else follows, in the order the week already ranked them.
+        var candidates: [Player]
 
         enum Kind: Equatable, Sendable {
             case rest
             case play
         }
 
-        /// Rest keeps the bring-in suggestion. Play asks who leaves, with the same shape.
-        var heading: String {
-            switch kind {
-            case .rest: "Bring in"
-            case .play: "Replace"
-            }
-        }
+        /// Rest and Play share this list. Nothing changes until one of these names is chosen.
+        var heading: String { "Replace with" }
 
-        var primaryTitle: String {
-            switch kind {
-            case .rest: "Rest, bring in \(suggestion.fullName)"
-            case .play: "Play, replace \(suggestion.fullName)"
-            }
-        }
-
-        var othersHeading: String { "Or someone else" }
-
-        var suggestionDetail: String {
-            "\(suggestion.overall) · \(suggestion.fitnessBand().label) \(suggestion.condition)"
-        }
-
-        /// Sit this starter. The suggestion is the best teammate who can come in.
+        /// Sit this starter. The first name is the best teammate who can come in.
         static func resting(_ starter: Player, in players: [Player]) -> State? {
             guard starter.isStarter, starter.injury == nil,
                   let suggestion = WeekBetween.bestFit(replacing: starter, in: players)
@@ -45,12 +27,11 @@ struct SubstitutionFeature {
             return State(
                 kind: .rest,
                 subject: starter,
-                suggestion: suggestion,
-                others: WeekBetween.alternatives(replacing: starter, in: players)
+                candidates: [suggestion] + WeekBetween.alternatives(replacing: starter, in: players)
             )
         }
 
-        /// Bring this bench player on. The suggestion is the starter they would sit.
+        /// Bring this bench player on. The first name is the starter they would sit.
         static func playing(_ bench: Player, in players: [Player]) -> State? {
             guard !bench.isStarter, bench.injury == nil,
                   let suggestion = WeekBetween.starterToSit(for: bench, in: players)
@@ -58,8 +39,7 @@ struct SubstitutionFeature {
             return State(
                 kind: .play,
                 subject: bench,
-                suggestion: suggestion,
-                others: WeekBetween.otherStarters(for: bench, in: players)
+                candidates: [suggestion] + WeekBetween.otherStarters(for: bench, in: players)
             )
         }
 
@@ -72,8 +52,7 @@ struct SubstitutionFeature {
 
         /// The chosen row. Rest’s choice comes in. Play’s choice is the starter who sits.
         func swap(chosenID: Player.ID) -> (outgoing: Player.ID, incoming: Player.ID)? {
-            let known = chosenID == suggestion.id || others.contains { $0.id == chosenID }
-            guard known else { return nil }
+            guard candidates.contains(where: { $0.id == chosenID }) else { return nil }
             switch kind {
             case .rest:
                 return (subject.id, chosenID)
@@ -89,8 +68,7 @@ struct SubstitutionFeature {
 
         @CasePathable
         enum View {
-            case suggestionTapped
-            case otherTapped(Player.ID)
+            case nameTapped(Player.ID)
             case cancelTapped
         }
 
@@ -104,11 +82,8 @@ struct SubstitutionFeature {
     var body: some ReducerOf<Self> {
         Reduce<State, Action> { state, action in
             switch action {
-            case .view(.suggestionTapped):
-                return .send(.delegate(.chosen(state.suggestion.id)))
-
-            case let .view(.otherTapped(id)):
-                guard state.others.contains(where: { $0.id == id }) else { return .none }
+            case let .view(.nameTapped(id)):
+                guard state.candidates.contains(where: { $0.id == id }) else { return .none }
                 return .send(.delegate(.chosen(id)))
 
             case .view(.cancelTapped):

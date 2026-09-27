@@ -13,10 +13,7 @@ struct SubstitutionView: View {
                     Text(store.subject.fullName)
                         .font(theme.type.clubName)
                         .foregroundStyle(theme.colors.text.color)
-                    suggestion
-                    if !store.others.isEmpty {
-                        others
-                    }
+                    candidates
                 }
                 .padding(theme.space.lg)
                 .readingWidth()
@@ -40,34 +37,15 @@ struct SubstitutionView: View {
         .presentationBackground(theme.colors.background.color)
     }
 
-    private var suggestion: some View {
+    private var candidates: some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
             Text(store.heading)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.secondaryText.color)
-            Button {
-                store.send(.view(.suggestionTapped))
-            } label: {
-                VStack(spacing: theme.space.xxs) {
-                    Text(store.primaryTitle)
-                    Text(store.suggestionDetail)
-                        .font(theme.type.captionNumber)
-                }
-            }
-            .buttonStyle(ThemeActionButtonStyle())
-            .accessibilityLabel(suggestionLabel)
-        }
-    }
-
-    private var others: some View {
-        VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text(store.othersHeading)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
             WeekCard {
-                ForEach(Array(store.others.enumerated()), id: \.element.id) { index, player in
+                ForEach(Array(store.candidates.enumerated()), id: \.element.id) { index, player in
                     Button {
-                        store.send(.view(.otherTapped(player.id)))
+                        store.send(.view(.nameTapped(player.id)))
                     } label: {
                         HStack(spacing: theme.space.sm) {
                             Circle()
@@ -90,8 +68,8 @@ struct SubstitutionView: View {
                         .frame(minHeight: theme.metrics.minimumControl)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(otherLabel(player))
-                    if index < store.others.count - 1 {
+                    .accessibilityLabel(nameLabel(player))
+                    if index < store.candidates.count - 1 {
                         WeekHairline()
                     }
                 }
@@ -99,18 +77,7 @@ struct SubstitutionView: View {
         }
     }
 
-    private var suggestionLabel: String {
-        let detail = "overall \(store.suggestion.overall), \(store.suggestion.fitnessBand().label), fitness \(store.suggestion.condition)"
-        switch store.kind {
-        case .rest:
-            return "Rest \(store.subject.fullName) and bring in \(store.suggestion.fullName), \(detail)"
-        case .play:
-            return "Play \(store.subject.fullName) and replace \(store.suggestion.fullName), \(detail)"
-        }
-    }
-
-    private func otherLabel(_ player: Player) -> String {
-        let verb = store.kind == .rest ? "Bring in" : "Replace"
-        return "\(verb) \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
+    private func nameLabel(_ player: Player) -> String {
+        "Replace with \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
     }
 }
