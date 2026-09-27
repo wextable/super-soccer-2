@@ -356,6 +356,25 @@ struct MatchweekFeatureTests {
         await store.send(.view(.playerTapped("missing")))
     }
 
+    @Test func advanceWeekNamesTheUpcomingWeek() {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        #expect(state.weekNumber == 1)
+        #expect(state.advanceWeekTitle == "Advance to week 2")
+        state.weekIndex = 36
+        #expect(state.weekNumber == 37)
+        #expect(state.advanceWeekTitle == "Advance to week 38")
+    }
+
+    @Test func aPlayedMatchListsTheUserClubScorersThenTheOpponent() throws {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let opener = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let fixture = try #require(opener.fixture)
+        #expect(opener.matchScorers.isEmpty)
+        try expectScorerGroups(userClubID: fixture.homeID, season: season)
+        try expectScorerGroups(userClubID: fixture.awayID, season: season)
+    }
+
     @Test func leadersStayEmptyUntilTheWeekIsOnTheTable() async throws {
         let season = LeagueDraft.makeLeague(seed: 42)
         let store = TestStore(initialState: MatchweekFeature.State(userClubID: "manchester-city", season: season)) {
@@ -688,6 +707,79 @@ private func marking(
         }
         return copy
     }
+}
+
+private func expectScorerGroups(userClubID: String, season: LeagueDraft.Season) throws {
+    var state = MatchweekFeature.State(userClubID: userClubID, season: season)
+    let fixture = try #require(state.fixture)
+    let home = try #require(state.clubs.first { $0.id == fixture.homeID })
+    let away = try #require(state.clubs.first { $0.id == fixture.awayID })
+    let user = try #require(state.userClub)
+    let opponent = try #require(state.opponent)
+    let userShooter = try #require(user.starters.first { $0.position == .forward })
+    let userSecond = try #require(user.starters.first { $0.id != userShooter.id && $0.position != .keeper })
+    let opponentShooter = try #require(opponent.starters.first { $0.position == .forward })
+    let userIsHome = state.userIsHome
+
+    func shot(
+        id: Int,
+        shooter: Player,
+        keeper: Player,
+        minute: Int,
+        isHome: Bool,
+        result: ShotResult = .goal
+    ) -> Shot {
+        Shot(
+            id: id,
+            type: .regular,
+            result: result,
+            shooter: shooter,
+            passer: nil,
+            keeper: keeper,
+            minute: minute,
+            isHome: isHome
+        )
+    }
+
+    let opener = shot(id: 0, shooter: opponentShooter, keeper: user.keeper, minute: 3, isHome: !userIsHome)
+    let saved = shot(id: 1, shooter: userShooter, keeper: opponent.keeper, minute: 6, isHome: userIsHome, result: .save)
+    let first = shot(id: 2, shooter: userShooter, keeper: opponent.keeper, minute: 18, isHome: userIsHome)
+    let missed = shot(id: 3, shooter: userSecond, keeper: opponent.keeper, minute: 27, isHome: userIsHome, result: .miss)
+    let repeatGoal = shot(id: 4, shooter: userShooter, keeper: opponent.keeper, minute: 44, isHome: userIsHome)
+    let late = shot(id: 5, shooter: userSecond, keeper: opponent.keeper, minute: 70, isHome: userIsHome)
+    let result = MatchResult(
+        homeScore: userIsHome ? 3 : 1,
+        awayScore: userIsHome ? 1 : 3,
+        shots: [late, opener, saved, repeatGoal, first, missed],
+        highlight: first,
+        commentary: "",
+        seed: 1
+    )
+    state.pending = Matchweek.Played(
+        scorelines: [
+            Matchweek.Scoreline(
+                homeID: home.id,
+                awayID: away.id,
+                homeScore: result.homeScore,
+                awayScore: result.awayScore
+            )
+        ],
+        tallies: [],
+        userMatch: result,
+        home: home,
+        away: away
+    )
+    #expect(state.matchScorers.isEmpty)
+    state.committedWeeks = 1
+
+    let groups = state.matchScorers
+    #expect(groups.map(\.clubName) == [user.name, opponent.name])
+    let userLines = try #require(groups.first)
+    let opponentLines = try #require(groups.last)
+    #expect(userLines.lines.map(\.label) == ["\(userShooter.fullName) (2)", userSecond.fullName])
+    #expect(userLines.lines.map(\.goals) == [2, 1])
+    #expect(opponentLines.lines.map(\.label) == [opponentShooter.fullName])
+    #expect(opponentLines.lines.allSatisfy { !$0.label.contains("(") })
 }
 
 private func listedShots(_ shots: [Shot]) -> [Shot] {
