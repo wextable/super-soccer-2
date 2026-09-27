@@ -57,6 +57,27 @@ struct MatchweekFeature {
             var id: String { "\(homeID)-\(awayID)" }
         }
 
+        struct ScorerLine: Equatable, Identifiable, Sendable {
+            var playerID: Player.ID
+            var name: String
+            var goals: Int
+
+            var id: String { playerID }
+
+            /// One goal is the name. Repeats carry a count: "Marvin Dave (2)".
+            var label: String {
+                goals > 1 ? "\(name) (\(goals))" : name
+            }
+        }
+
+        struct ScorerGroup: Equatable, Identifiable, Sendable {
+            var clubID: String
+            var clubName: String
+            var lines: [ScorerLine]
+
+            var id: String { clubID }
+        }
+
         init(userClubID: String, season: LeagueDraft.Season) {
             self.userClubID = userClubID
             clubs = season.clubs
@@ -87,6 +108,10 @@ struct MatchweekFeature {
         }
 
         var weekNumber: Int { weekIndex + 1 }
+
+        var nextWeekNumber: Int { weekNumber + 1 }
+
+        var advanceWeekTitle: String { "Advance to week \(nextWeekNumber)" }
 
         var currentWeekIsInTheTable: Bool { committedWeeks > weekIndex }
 
@@ -158,6 +183,49 @@ struct MatchweekFeature {
                 }
                 .prefix(3)
                 .map(\.element)
+        }
+
+        /// This match's scorers. The user's club, then the opponent. Empty before the week is on the table.
+        var matchScorers: [ScorerGroup] {
+            guard currentWeekIsInTheTable, let pending, let user = userClub, let opponent else { return [] }
+            return [
+                ScorerGroup(
+                    clubID: user.id,
+                    clubName: user.name,
+                    lines: scorerLines(in: pending.userMatch.shots, isHome: userIsHome)
+                ),
+                ScorerGroup(
+                    clubID: opponent.id,
+                    clubName: opponent.name,
+                    lines: scorerLines(in: pending.userMatch.shots, isHome: !userIsHome)
+                )
+            ]
+        }
+
+        private func scorerLines(in shots: [Shot], isHome: Bool) -> [ScorerLine] {
+            let goals = shots.enumerated().filter { $0.element.isHome == isHome && $0.element.result == .goal }
+            let ordered = goals.sorted { lhs, rhs in
+                if lhs.element.minute != rhs.element.minute {
+                    return lhs.element.minute < rhs.element.minute
+                }
+                return lhs.offset < rhs.offset
+            }
+            var order: [Player.ID] = []
+            var names: [Player.ID: String] = [:]
+            var counts: [Player.ID: Int] = [:]
+            for shot in ordered.map(\.element) {
+                let id = shot.shooter.id
+                if counts[id] == nil {
+                    order.append(id)
+                    names[id] = shot.shooter.fullName
+                    counts[id] = 1
+                } else {
+                    counts[id, default: 0] += 1
+                }
+            }
+            return order.map { id in
+                ScorerLine(playerID: id, name: names[id] ?? "", goals: counts[id] ?? 0)
+            }
         }
 
         var weekLines: [WeekLine] {

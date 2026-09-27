@@ -217,7 +217,7 @@ struct WeekTab: View {
     @ViewBuilder
     private var footer: some View {
         if store.hasNextFixture {
-            Button("Advance week") {
+            Button(store.advanceWeekTitle) {
                 store.send(.view(.nextFixtureButtonTapped))
             }
             .buttonStyle(ThemeActionButtonStyle())
@@ -257,9 +257,13 @@ struct MatchTab: View {
                     )
                     .frame(maxWidth: .infinity, minHeight: theme.metrics.emptyMinHeight)
                 } else if let opponent = store.opponent {
-                    opponentCard(opponent)
-                    if !store.keyPlayers.isEmpty {
-                        keyPlayers
+                    if store.currentWeekIsInTheTable {
+                        scorers
+                    } else {
+                        opponentCard(opponent)
+                        if !store.keyPlayers.isEmpty {
+                            keyPlayers
+                        }
                     }
                     controls
                 }
@@ -388,6 +392,32 @@ struct MatchTab: View {
         return label
     }
 
+    private var scorers: some View {
+        VStack(alignment: .leading, spacing: theme.space.lg) {
+            ForEach(store.matchScorers) { group in
+                VStack(alignment: .leading, spacing: theme.space.sm) {
+                    Text(group.clubName)
+                        .font(theme.type.opponentName)
+                        .foregroundStyle(theme.colors.text.color)
+                    if !group.lines.isEmpty {
+                        WeekCard {
+                            ForEach(group.lines) { line in
+                                Text(line.label)
+                                    .font(theme.type.playerName)
+                                    .foregroundStyle(theme.colors.text.color)
+                                    .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
+                                if line.id != group.lines.last?.id {
+                                    WeekHairline()
+                                }
+                            }
+                        }
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
     private var controls: some View {
         VStack(spacing: theme.space.sm) {
             if !store.currentWeekIsInTheTable {
@@ -401,13 +431,13 @@ struct MatchTab: View {
                 .buttonStyle(ThemeActionButtonStyle())
             }
             if store.currentWeekIsInTheTable, store.pending != nil {
-                Button("Watch the beat") {
+                Button("Watch replay") {
                     store.send(.view(.replayButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
             if store.hasNextFixture {
-                Button("Advance week") {
+                Button(store.advanceWeekTitle) {
                     store.send(.view(.nextFixtureButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())
