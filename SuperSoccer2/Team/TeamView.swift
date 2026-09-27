@@ -33,11 +33,8 @@ struct TeamScreen: View {
     var points: Int
     var goalDifference: Int
     var canManage: Bool = false
-    var offers: [SkillOffer] = []
-    var choices: [SkillChoice] = []
     var onPlayer: (Player.ID) -> Void
     var onRest: ((Player.ID) -> Void)? = nil
-    var onSkill: ((SkillOffer.ID, PlayerStat) -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -46,9 +43,6 @@ struct TeamScreen: View {
                 record
                 if !club.injuryLines.isEmpty {
                     injuries
-                }
-                if canManage, !offers.isEmpty {
-                    skills
                 }
                 roster(title: "Starting", players: club.starters, canRest: canManage)
                 roster(title: "Bench", players: club.bench, canRest: false)
@@ -129,50 +123,6 @@ struct TeamScreen: View {
         }
     }
 
-    private var skills: some View {
-        VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text("Skills")
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            ForEach(offers) { offer in
-                skillCard(offer)
-            }
-        }
-    }
-
-    private func skillCard(_ offer: SkillOffer) -> some View {
-        let name = club.players.first { $0.id == offer.playerID }?.fullName ?? "A player"
-        return WeekCard {
-            Text("\(name) earned a skill")
-                .font(theme.type.playerName)
-                .foregroundStyle(theme.colors.text.color)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: theme.metrics.minimumControl)
-            Text("Pick one stat")
-                .font(theme.type.captionNumber)
-                .foregroundStyle(theme.colors.secondaryText.color)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(choices) { choice in
-                WeekHairline()
-                Button {
-                    onSkill?(offer.id, choice.stat)
-                } label: {
-                    HStack {
-                        Text(choice.stat.label)
-                            .font(theme.type.playerName)
-                        Spacer()
-                        Text("+\(choice.points)")
-                            .font(theme.type.playerOverall)
-                    }
-                    .foregroundStyle(theme.colors.text.color)
-                    .frame(minHeight: theme.metrics.minimumControl)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(choice.stat.label), plus \(choice.points), for \(name)")
-            }
-        }
-    }
-
     private func roster(title: String, players: [Player], canRest: Bool) -> some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
             Text(title)
@@ -221,13 +171,11 @@ struct TeamScreen: View {
                             .foregroundStyle(bandColor(player))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("\(player.overall)")
-                        .font(theme.type.playerOverall)
-                        .foregroundStyle(theme.colors.text.color)
+                    StarterRating(player: player)
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(player.fullName), \(player.position.label), \(mark), overall \(player.overall)")
+            .accessibilityLabel(playerLabel(player, mark: mark))
             if showRest {
                 Button("Rest") {
                     onRest?(player.id)
@@ -246,12 +194,16 @@ struct TeamScreen: View {
         return "Rest \(player.fullName) and bring in \(incoming)"
     }
 
+    private func playerLabel(_ player: Player, mark: String) -> String {
+        var label = "\(player.fullName), \(player.position.label), \(mark), overall \(player.overall)"
+        if player.isStarter, player.injury == nil, player.overall != player.optimalOverall {
+            label += ", full fitness \(player.optimalOverall)"
+        }
+        return label
+    }
+
     private func bandColor(_ player: Player) -> Color {
         if player.injury != nil { return theme.colors.fitnessRed.color }
-        switch player.fitnessBand() {
-        case .green: return theme.colors.fitnessGreen.color
-        case .yellow: return theme.colors.fitnessYellow.color
-        case .red: return theme.colors.fitnessRed.color
-        }
+        return theme.colors.fitness(player.fitnessBand())
     }
 }

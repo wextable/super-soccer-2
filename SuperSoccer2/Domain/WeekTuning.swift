@@ -1,15 +1,18 @@
 import Foundation
 
-/// How fit a player is for the next match. Green is full ratings. Red is the band you reach by playing through yellow.
+/// How fit a player is for the next match.
+/// Green is full ratings. Yellow is a mild drop. Orange is close to red. Red is the high risk.
 enum FitnessBand: Equatable, Sendable {
     case green
     case yellow
+    case orange
     case red
 
     var label: String {
         switch self {
         case .green: "Green"
         case .yellow: "Yellow"
+        case .orange: "Orange"
         case .red: "Red"
         }
     }
@@ -17,8 +20,9 @@ enum FitnessBand: Equatable, Sendable {
     /// A higher rank is fitter. Other clubs only bring in someone from a higher rank.
     var rank: Int {
         switch self {
-        case .green: 2
-        case .yellow: 1
+        case .green: 3
+        case .yellow: 2
+        case .orange: 1
         case .red: 0
         }
     }
@@ -85,17 +89,22 @@ struct WeekTuning: Equatable, Sendable {
     var benchRecovery: Int
     /// Condition at or above this is green.
     var greenMinimum: Int
-    /// Condition at or above this, and below green, is yellow. Below this is red.
+    /// Condition at or above this, and below green, is yellow. A mild drop.
     var yellowMinimum: Int
+    /// Condition at or above this, and below yellow, is orange. Close to red. Below this is red.
+    var orangeMinimum: Int
     /// Percent chance a green starter is hurt. Negligible.
     var injuryChanceGreen: Int
-    /// Percent chance a yellow starter is hurt. Milder than red.
+    /// Percent chance a yellow starter is hurt. Milder than orange.
     var injuryChanceYellow: Int
+    /// Percent chance an orange starter is hurt. Higher than yellow. Red stays higher.
+    var injuryChanceOrange: Int
     /// Percent chance a red starter is hurt. High.
     var injuryChanceRed: Int
     /// Multiplier on the ratings the match already uses. Green leaves them alone.
     var ratingScaleGreen: Double
     var ratingScaleYellow: Double
+    var ratingScaleOrange: Double
     var ratingScaleRed: Double
     var xpForStart: Int
     var xpForGoal: Int
@@ -117,18 +126,22 @@ struct WeekTuning: Equatable, Sendable {
     var injuryWeeksMin: Int
     var injuryWeeksMax: Int
 
-    /// A month of starts stays green. Yellow takes a longer run. Red takes playing through that yellow.
+    /// A month of starts stays green. The next starts are yellow, a mild drop.
+    /// Orange is the longer run after that, close to red. Red stays the high risk.
     /// One bench week puts the first red week back in the green.
     static let current = WeekTuning(
         fitnessLossPerStart: 2,
         benchRecovery: 28,
         greenMinimum: 84,
-        yellowMinimum: 64,
+        yellowMinimum: 78,
+        orangeMinimum: 64,
         injuryChanceGreen: 1,
         injuryChanceYellow: 6,
+        injuryChanceOrange: 22,
         injuryChanceRed: 40,
         ratingScaleGreen: 1,
         ratingScaleYellow: 0.96,
+        ratingScaleOrange: 0.90,
         ratingScaleRed: 0.88,
         xpForStart: 10,
         xpForGoal: 5,
@@ -152,6 +165,7 @@ struct WeekTuning: Equatable, Sendable {
     func band(for condition: Int) -> FitnessBand {
         if condition >= greenMinimum { return .green }
         if condition >= yellowMinimum { return .yellow }
+        if condition >= orangeMinimum { return .orange }
         return .red
     }
 
@@ -159,6 +173,7 @@ struct WeekTuning: Equatable, Sendable {
         switch band {
         case .green: ratingScaleGreen
         case .yellow: ratingScaleYellow
+        case .orange: ratingScaleOrange
         case .red: ratingScaleRed
         }
     }
@@ -167,6 +182,7 @@ struct WeekTuning: Equatable, Sendable {
         switch band {
         case .green: injuryChanceGreen
         case .yellow: injuryChanceYellow
+        case .orange: injuryChanceOrange
         case .red: injuryChanceRed
         }
     }

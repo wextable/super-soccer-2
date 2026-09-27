@@ -87,13 +87,20 @@ struct LeagueTableTests {
         let rows = Dictionary(uniqueKeysWithValues: next.map { ($0.clubID, $0) })
         #expect(rows["home"]?.played == 1)
         #expect(rows["home"]?.points == 3)
+        #expect(rows["home"]?.recordLine == "1/0/0")
         #expect(rows["home"]?.goalDifference == 2)
         #expect(rows["away"]?.points == 0)
+        #expect(rows["away"]?.recordLine == "0/1/0")
         #expect(rows["away"]?.goalDifference == -2)
         #expect(rows["draw-home"]?.points == 1)
+        #expect(rows["draw-home"]?.recordLine == "0/0/1")
         #expect(rows["draw-away"]?.points == 1)
+        #expect(rows["draw-away"]?.recordLine == "0/0/1")
         #expect(rows["draw-home"]?.goalDifference == 0)
         #expect(rows["draw-away"]?.goalDifference == 0)
+        for row in next {
+            #expect(row.won + row.drawn + row.lost == row.played)
+        }
     }
 
     @Test func rankUsesPointsThenGoalDifferenceThenOverall() throws {
@@ -121,6 +128,22 @@ struct LeagueTableTests {
         let tiedNorwich = try #require(byOverall.firstIndex { $0.clubID == norwich.id })
         let tiedCity = try #require(byOverall.firstIndex { $0.clubID == city.id })
         #expect(tiedCity < tiedNorwich)
+    }
+
+    @Test func anOlderTableWithoutARecordStillLoads() throws {
+        let json = """
+        {"clubID":"home","played":4,"points":7,"goalsFor":5,"goalsAgainst":3}
+        """.data(using: .utf8)!
+        let row = try JSONDecoder().decode(Standing.self, from: json)
+        #expect(row.played == 4)
+        #expect(row.points == 7)
+        #expect(row.won == 0)
+        #expect(row.drawn == 0)
+        #expect(row.lost == 0)
+        #expect(row.recordLine == "0/0/0")
+        let again = try JSONDecoder().decode(Standing.self, from: JSONEncoder().encode(row))
+        #expect(again == row)
+        #expect(again.won == 0)
     }
 }
 

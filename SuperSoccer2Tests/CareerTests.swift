@@ -63,6 +63,7 @@ struct CareerPersistenceTests {
         let player = try #require(state.userClub?.starters.first)
         let stat = PlayerStat.shooting
         let points = WeekTuning.current.points(for: stat)
+        state.committedWeeks = 1
         state.skillOffers = [SkillOffer(id: "offer-1", playerID: player.id, clubID: "manchester-city")]
         let box = CareerBox()
         let store = TestStore(initialState: state) {
@@ -72,10 +73,17 @@ struct CareerPersistenceTests {
         }
         store.exhaustivity = .off
 
-        await store.send(.view(.skillStatTapped("offer-1", stat)))
+        await store.send(.view(.nextFixtureButtonTapped))
+        let choice = try #require(store.state.skillChoice)
+        #expect(store.state.weekIndex == 0)
+        #expect(choice.player.position == player.position)
+        #expect(choice.player.ratings == player.ratings)
+        await store.send(.skillChoice(.presented(.view(.statTapped(stat)))))
+        await store.skipReceivedActions()
         await store.finish()
         let saved = try #require(await box.load())
         #expect(saved.skillOffers.isEmpty)
+        #expect(saved.weekIndex == 1)
         let updated = try #require(saved.clubs.first { $0.id == "manchester-city" }?.players.first { $0.id == player.id })
         #expect(updated.ratings.shooting == player.ratings.shooting + points)
         #expect(updated.skillsEarned == player.skillsEarned + 1)

@@ -14,6 +14,15 @@ enum Position: String, Codable, Equatable, Sendable, CaseIterable {
         case .forward: "FWD"
         }
     }
+
+    var title: String {
+        switch self {
+        case .keeper: "Keeper"
+        case .defender: "Defender"
+        case .midfielder: "Midfielder"
+        case .forward: "Forward"
+        }
+    }
 }
 
 struct Ratings: Codable, Equatable, Sendable {
@@ -82,6 +91,17 @@ struct Ratings: Codable, Equatable, Sendable {
                 + Double(passing) * 0.35
         )
     }
+
+    func value(for stat: PlayerStat) -> Int {
+        switch stat {
+        case .speed: speed
+        case .shooting: shooting
+        case .passing: passing
+        case .dribbling: dribbling
+        case .defending: defending
+        case .goalkeeping: goalkeeping
+        }
+    }
 }
 
 struct Player: Codable, Equatable, Sendable, Identifiable {
@@ -110,9 +130,14 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
         return "\(firstName) \(lastName)"
     }
 
+    /// The blend at full fitness. The match uses `overall`, which is this after the band scale.
+    var optimalOverall: Int {
+        ratings.overall(for: position)
+    }
+
     /// Integer blend, then the fitness-band scale. Green leaves the blend unchanged.
     var overall: Int {
-        adjusted(ratings.overall(for: position))
+        adjusted(optimalOverall)
     }
 
     func fitnessBand(tuning: WeekTuning = .current) -> FitnessBand {

@@ -19,6 +19,30 @@ struct WeekCard<Content: View>: View {
     }
 }
 
+/// The rating a starter would play at. When fitness has taken some off, the full-fitness number sits under it.
+struct StarterRating: View {
+    @Environment(\.theme) private var theme
+    var player: Player
+
+    private var showsDrop: Bool {
+        player.isStarter && player.injury == nil && player.overall != player.optimalOverall
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Text("\(player.overall)")
+                .font(theme.type.playerOverall)
+                .foregroundStyle(theme.colors.text.color)
+            if showsDrop {
+                Text("fit \(player.optimalOverall)")
+                    .font(theme.type.captionNumber)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 struct WeekHairline: View {
     @Environment(\.theme) private var theme
 
