@@ -403,6 +403,7 @@ struct MatchweekFeature {
 
     enum Action {
         case view(View)
+        case delegate(Delegate)
         case highlight(PresentationAction<HighlightFeature.Action>)
         case stats(PresentationAction<MatchStatsFeature.Action>)
         case leaders(PresentationAction<LeadersFeature.Action>)
@@ -421,12 +422,18 @@ struct MatchweekFeature {
             case replayButtonTapped
             case nextFixtureButtonTapped
             case tabSelected(State.Tab)
+            case menuButtonTapped
             case leadersButtonTapped
             case championshipButtonTapped
             case teamButtonTapped(String)
             case playerTapped(Player.ID)
             case restStarter(Player.ID)
             case playBench(Player.ID)
+        }
+
+        @CasePathable
+        enum Delegate {
+            case openMenu
         }
 
         @CasePathable
@@ -501,6 +508,12 @@ struct MatchweekFeature {
 
             case let .view(.tabSelected(tab)):
                 state.tab = tab
+                return .none
+
+            case .view(.menuButtonTapped):
+                return .send(.delegate(.openMenu))
+
+            case .delegate:
                 return .none
 
             case .view(.leadersButtonTapped):

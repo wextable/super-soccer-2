@@ -504,22 +504,24 @@ struct AppFeatureTests {
         #expect(store.state.frontDoor.canContinue == false)
         await store.send(.frontDoor(.view(.newGameButtonTapped)))
         await store.skipReceivedActions()
-        guard let selectionID = store.state.path.ids.first else {
-            Issue.record("Club selection was not pushed")
+        guard store.state.selection != nil else {
+            Issue.record("Club selection was not presented")
             return
         }
-        await store.send(.path(.element(id: selectionID, action: .selection(.view(.onAppear)))))
-        let selection = try #require(store.state.path[id: selectionID, case: \.selection])
+        await store.send(.selection(.presented(.view(.onAppear))))
+        let selection = try #require(store.state.selection)
         #expect(selection.clubs.map(\.name) == ["Manchester City", "Norwich City"])
         #expect(selection.season?.clubs.count == 20)
 
-        await store.send(.path(.element(id: selectionID, action: .selection(.view(.clubTapped("norwich-city"))))))
+        await store.send(.selection(.presented(.view(.clubTapped("norwich-city")))))
         await store.skipReceivedActions()
-        guard let pathID = store.state.path.ids.last else {
-            Issue.record("The week was not pushed")
+        #expect(store.state.selection == nil)
+        #expect(store.state.menu == nil)
+        guard store.state.game != nil else {
+            Issue.record("The season did not become the root")
             return
         }
-        let week = try #require(store.state.path[id: pathID, case: \.matchweek])
+        let week = try #require(store.state.game)
         let fixture = try #require(week.fixture)
         #expect(week.userClub?.name == "Norwich City")
         #expect(week.clubs.count == 20)
@@ -527,8 +529,8 @@ struct AppFeatureTests {
         #expect(week.opponent?.id != "norwich-city")
         #expect(week.standings.allSatisfy { $0.played == 0 })
 
-        await store.send(.path(.element(id: pathID, action: .matchweek(.view(.kickOffButtonTapped)))))
-        let played = try #require(store.state.path[id: pathID, case: \.matchweek])
+        await store.send(.game(.view(.kickOffButtonTapped)))
+        let played = try #require(store.state.game)
         let userMatch = try #require(played.pending?.userMatch)
         let shot = try #require(userMatch.shots.first)
         let home = try #require(played.pending?.home)
@@ -552,21 +554,12 @@ struct AppFeatureTests {
             )
         )
 
-        await store.send(.path(.element(
-            id: pathID,
-            action: .matchweek(.highlight(.presented(.view(.skipButtonTapped))))
-        )))
-        await store.send(.path(.element(
-            id: pathID,
-            action: .matchweek(.highlight(.presented(.view(.statsButtonTapped))))
-        )))
+        await store.send(.game(.highlight(.presented(.view(.skipButtonTapped)))))
+        await store.send(.game(.highlight(.presented(.view(.statsButtonTapped)))))
         await store.skipReceivedActions()
-        await store.send(.path(.element(
-            id: pathID,
-            action: .matchweek(.stats(.presented(.view(.backButtonTapped))))
-        )))
+        await store.send(.game(.stats(.presented(.view(.backButtonTapped)))))
         await store.skipReceivedActions()
-        let returned = try #require(store.state.path[id: pathID, case: \.matchweek])
+        let returned = try #require(store.state.game)
         #expect(returned.highlight == nil)
         #expect(returned.currentWeekIsInTheTable)
         #expect(returned.standings.allSatisfy { $0.played == 1 })
@@ -580,12 +573,116 @@ struct AppFeatureTests {
         #expect(userStanding.points == points)
         #expect(userStanding.goalDifference == scored - conceded)
 
-        await store.send(.path(.element(id: pathID, action: .matchweek(.view(.nextFixtureButtonTapped)))))
-        let next = try #require(store.state.path[id: pathID, case: \.matchweek])
+        await store.send(.game(.view(.nextFixtureButtonTapped)))
+        let next = try #require(store.state.game)
         #expect(next.weekIndex == 1)
         #expect(next.currentWeekIsInTheTable == false)
         #expect(next.pending == nil)
         #expect(next.standings.allSatisfy { $0.played == 1 })
+    }
+
+    @Test func theMenuButtonPresentsTheMenuOverTheSeason() async throws {
+        let season = LeagueDraft.makeLeague(seed: 9)
+        let store = TestStore(
+            initialState: AppFeature.State(
+                game: MatchweekFeature.State(userClubID: "norwich-city", season: season)
+            )
+        ) {
+            AppFeature()
+        }
+
+        await store.send(.game(.view(.menuButtonTapped)))
+        await store.receive(\.game.delegate.openMenu) {
+            $0.menu = FrontDoorFeature.State(mode: .menu)
+        }
+        #expect(store.state.game?.userClubID == "norwich-city")
+        #expect(store.state.selection == nil)
+    }
+
+    @Test func closingTheMenuLeavesTheSeasonInPlace() async throws {
+        let season = LeagueDraft.makeLeague(seed: 9)
+        let store = TestStore(
+            initialState: AppFeature.State(
+                game: MatchweekFeature.State(userClubID: "norwich-city", season: season),
+                menu: FrontDoorFeature.State(mode: .menu)
+            )
+        ) {
+            AppFeature()
+        }
+
+        await store.send(.menu(.presented(.view(.dismissButtonTapped))))
+        await store.receive(\.menu.presented.delegate.dismiss) {
+            $0.menu = nil
+        }
+        #expect(store.state.game?.userClubID == "norwich-city")
+        #expect(store.state.selection == nil)
+    }
+
+    @Test func continueFromTheMenuDoesNothing() async throws {
+        let season = LeagueDraft.makeLeague(seed: 9)
+        var menu = FrontDoorFeature.State(mode: .menu)
+        menu.hasChecked = true
+        menu.canContinue = true
+        let store = TestStore(
+            initialState: AppFeature.State(
+                game: MatchweekFeature.State(userClubID: "norwich-city", season: season),
+                menu: menu
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.careerStore.load = {
+                Issue.record("Continue loaded a career from the menu")
+                return nil
+            }
+        }
+
+        await store.send(.menu(.presented(.view(.continueButtonTapped))))
+        #expect(store.state.game?.userClubID == "norwich-city")
+        #expect(store.state.game?.weekIndex == 0)
+        #expect(store.state.menu?.mode == .menu)
+    }
+
+    @Test func aNewGameFromTheMenuDismissesSelectionWhenAClubIsChosen() async throws {
+        let season = LeagueDraft.makeLeague(seed: 9)
+        var career = Career(matchweek: MatchweekFeature.State(userClubID: "norwich-city", season: season))
+        career.weekIndex = 4
+        let box = CareerBox()
+        await box.save(career)
+        let store = TestStore(
+            initialState: AppFeature.State(
+                game: MatchweekFeature.State(career: career),
+                menu: FrontDoorFeature.State(mode: .menu)
+            )
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.entropy.nextSeed = { 42 }
+            $0.careerStore = .inMemory(box)
+        }
+        store.exhaustivity = .off
+
+        await store.send(.menu(.presented(.view(.newGameButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.selection != nil)
+        #expect(store.state.menu != nil)
+        #expect(store.state.game?.userClubID == "norwich-city")
+        #expect(store.state.game?.weekIndex == 4)
+
+        await store.send(.selection(.presented(.view(.onAppear))))
+        await store.send(.selection(.presented(.view(.clubTapped("manchester-city")))))
+        await store.skipReceivedActions()
+        await store.finish()
+
+        #expect(store.state.selection == nil)
+        #expect(store.state.menu == nil)
+        let week = try #require(store.state.game)
+        #expect(week.userClubID == "manchester-city")
+        #expect(week.tab == .club)
+        #expect(week.weekIndex == 0)
+        let saved = try #require(await box.load())
+        #expect(saved.userClubID == "manchester-city")
+        #expect(saved.weekIndex == 0)
     }
 }
 

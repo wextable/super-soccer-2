@@ -5,6 +5,8 @@ import Foundation
 struct FrontDoorFeature {
     @ObservableState
     struct State: Equatable {
+        /// `.door` is the first screen. `.menu` is presented over a season already in progress.
+        var mode: Mode = .door
         var canContinue = false
         var hasChecked = false
         var isOpening = false
@@ -12,6 +14,11 @@ struct FrontDoorFeature {
         var newGameTaps = 0
         var continueTaps = 0
         var openFailures = 0
+
+        enum Mode: Equatable, Sendable {
+            case door
+            case menu
+        }
     }
 
     enum Action {
@@ -26,12 +33,14 @@ struct FrontDoorFeature {
             case onAppear
             case newGameButtonTapped
             case continueButtonTapped
+            case dismissButtonTapped
         }
 
         @CasePathable
         enum Delegate {
             case newGame
             case continueCareer(Career)
+            case dismiss
         }
     }
 
@@ -59,6 +68,7 @@ struct FrontDoorFeature {
                 return .send(.delegate(.newGame))
 
             case .view(.continueButtonTapped):
+                guard state.mode == .door else { return .none }
                 guard state.canContinue, !state.isOpening else { return .none }
                 state.continueTaps += 1
                 state.isOpening = true
@@ -70,6 +80,10 @@ struct FrontDoorFeature {
                         await send(.careerMissing)
                     }
                 }
+
+            case .view(.dismissButtonTapped):
+                guard state.mode == .menu else { return .none }
+                return .send(.delegate(.dismiss))
 
             case let .careerLoaded(career):
                 state.isOpening = false

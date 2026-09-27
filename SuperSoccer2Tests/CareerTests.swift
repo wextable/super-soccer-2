@@ -140,15 +140,16 @@ struct CareerPersistenceTests {
         await store.send(.frontDoor(.view(.onAppear)))
         await store.skipReceivedActions()
         #expect(store.state.frontDoor.canContinue)
+        #expect(store.state.game == nil)
         await store.send(.frontDoor(.view(.continueButtonTapped)))
         await store.skipReceivedActions()
-        let pathID = try #require(store.state.path.ids.first)
-        let week = try #require(store.state.path[id: pathID, case: \.matchweek])
+        let week = try #require(store.state.game)
         #expect(week.tab == .club)
         #expect(week.weekIndex == 4)
         #expect(week.committedWeeks == 4)
         #expect(week.userClubID == "norwich-city")
-        #expect(store.state.path.ids.count == 1)
+        #expect(store.state.selection == nil)
+        #expect(store.state.menu == nil)
     }
 
     @Test func newGameReplacesTheSavedCareer() async throws {
@@ -171,9 +172,10 @@ struct CareerPersistenceTests {
         #expect(store.state.frontDoor.canContinue)
         await store.send(.frontDoor(.view(.newGameButtonTapped)))
         await store.skipReceivedActions()
-        let selectionID = try #require(store.state.path.ids.first)
-        await store.send(.path(.element(id: selectionID, action: .selection(.view(.onAppear)))))
-        await store.send(.path(.element(id: selectionID, action: .selection(.view(.clubTapped("manchester-city"))))))
+        #expect(store.state.selection != nil)
+        #expect(store.state.game == nil)
+        await store.send(.selection(.presented(.view(.onAppear))))
+        await store.send(.selection(.presented(.view(.clubTapped("manchester-city")))))
         await store.skipReceivedActions()
         await store.finish()
 
@@ -182,10 +184,11 @@ struct CareerPersistenceTests {
         #expect(saved.weekIndex == 0)
         #expect(saved.committedWeeks == 0)
         #expect(saved.record == nil)
-        let weekID = try #require(store.state.path.ids.last)
-        let week = try #require(store.state.path[id: weekID, case: \.matchweek])
+        let week = try #require(store.state.game)
         #expect(week.tab == .club)
         #expect(week.userClubID == "manchester-city")
+        #expect(store.state.selection == nil)
+        #expect(store.state.menu == nil)
     }
 
     @Test func continueIsUnavailableWhenNoCareerExists() async throws {
@@ -223,7 +226,30 @@ struct CareerPersistenceTests {
         await store.skipReceivedActions()
         #expect(store.state.frontDoor.failedToOpen)
         #expect(store.state.frontDoor.canContinue == false)
-        #expect(store.state.path.isEmpty)
+        #expect(store.state.game == nil)
+        #expect(store.state.selection == nil)
+    }
+
+    @Test func continueDoesNothingFromTheMenu() async throws {
+        var state = FrontDoorFeature.State(mode: .menu)
+        state.hasChecked = true
+        state.canContinue = true
+        let store = TestStore(initialState: state) {
+            FrontDoorFeature()
+        } withDependencies: {
+            $0.careerStore.load = {
+                Issue.record("Continue loaded a career from the menu")
+                return nil
+            }
+        }
+
+        await store.send(.view(.continueButtonTapped))
+        await store.send(.view(.dismissButtonTapped))
+        await store.receive(\.delegate.dismiss)
+        await store.send(.view(.newGameButtonTapped)) {
+            $0.newGameTaps = 1
+        }
+        await store.receive(\.delegate.newGame)
     }
 
     @Test func theCareerFileRoundTripsTableSquadsAndAwards() async throws {
