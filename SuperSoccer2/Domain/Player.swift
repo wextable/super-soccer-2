@@ -156,6 +156,11 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
         adjusted(ratings.assist)
     }
 
+    /// This stat after the fitness-band scale. Green leaves the full-fitness number unchanged.
+    func playingRating(_ stat: PlayerStat) -> Int {
+        adjusted(ratings.value(for: stat))
+    }
+
     private func adjusted(_ rating: Int) -> Int {
         let scale = WeekTuning.current.ratingScale(for: fitnessBand())
         return Int(Double(rating) * scale)

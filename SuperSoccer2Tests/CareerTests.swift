@@ -42,6 +42,13 @@ struct CareerPersistenceTests {
         let starter = try #require(club.starters.first { WeekBetween.bestFit(replacing: $0, in: club.players) != nil })
         await store.send(.view(.restStarter(starter.id)))
         await store.finish()
+        #expect(writes.withLock { $0 } == 1)
+        let unchanged = try #require(await box.load())
+        let unchangedClub = try #require(unchanged.clubs.first { $0.id == "manchester-city" })
+        #expect(unchangedClub.starters.contains { $0.id == starter.id })
+
+        await store.send(.substitution(.presented(.view(.suggestionTapped))))
+        await store.finish()
         #expect(writes.withLock { $0 } == 2)
         let linedUp = try #require(await box.load())
         let savedClub = try #require(linedUp.clubs.first { $0.id == "manchester-city" })

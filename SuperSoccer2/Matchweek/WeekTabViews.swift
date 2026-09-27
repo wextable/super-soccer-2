@@ -8,13 +8,20 @@ struct ClubTab: View {
         if let club = store.userClub {
             TeamScreen(
                 club: club,
-                played: store.userStanding?.played ?? 0,
+                won: store.userStanding?.won ?? 0,
+                lost: store.userStanding?.lost ?? 0,
+                drawn: store.userStanding?.drawn ?? 0,
                 points: store.userStanding?.points ?? 0,
                 goalDifference: store.userStanding?.goalDifference ?? 0,
+                place: (store.userStanding?.played ?? 0) > 0 ? store.places[club.id] : nil,
                 canManage: true,
                 onPlayer: { store.send(.view(.playerTapped($0))) },
-                onRest: { store.send(.view(.restStarter($0))) }
+                onRest: { store.send(.view(.restStarter($0))) },
+                onPlay: { store.send(.view(.playBench($0))) }
             )
+            .sheet(item: $store.scope(state: \.substitution, action: \.substitution)) { substitutionStore in
+                SubstitutionView(store: substitutionStore)
+            }
         } else {
             TeamMissing()
         }

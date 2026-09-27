@@ -34,6 +34,19 @@ enum WeekBetween {
             .sorted(by: bestFirst)
     }
 
+    /// Lowest overall starter in the same role who can be sat. Condition breaks a tie.
+    static func starterToSit(for player: Player, in players: [Player]) -> Player? {
+        worst(of: sittingCandidates(for: player, in: players))
+    }
+
+    /// Other starters in that role, best overall first. The obvious player to sit is not in this list.
+    static func otherStarters(for player: Player, in players: [Player]) -> [Player] {
+        let sitID = starterToSit(for: player, in: players)?.id
+        return sittingCandidates(for: player, in: players)
+            .filter { $0.id != sitID }
+            .sorted(by: bestFirst)
+    }
+
     /// Sit a starter and bring in a teammate of the same role. An injured player cannot come in.
     static func replace(_ outgoingID: Player.ID, with incomingID: Player.ID, in club: Club) -> Club? {
         guard
@@ -161,8 +174,21 @@ enum WeekBetween {
         }
     }
 
+    private static func sittingCandidates(for player: Player, in players: [Player]) -> [Player] {
+        players.filter { candidate in
+            candidate.id != player.id
+                && candidate.position == player.position
+                && candidate.isStarter
+                && candidate.injury == nil
+        }
+    }
+
     private static func best(of players: [Player]) -> Player? {
         players.max(by: fitterFirst)
+    }
+
+    private static func worst(of players: [Player]) -> Player? {
+        players.min(by: fitterFirst)
     }
 
     /// `true` when `lhs` is the lesser player, so `max(by:)` keeps the better one.
