@@ -574,6 +574,7 @@ struct AppFeatureTests {
         #expect(userStanding.goalDifference == scored - conceded)
 
         await store.send(.game(.view(.nextFixtureButtonTapped)))
+        await finishPresentedWeekSteps(store)
         let next = try #require(store.state.game)
         #expect(next.weekIndex == 1)
         #expect(next.currentWeekIsInTheTable == false)

@@ -44,6 +44,11 @@ struct PlayerDetailView: View {
             Text(fitnessLine)
                 .font(theme.type.homeLine)
                 .foregroundStyle(fitnessColor)
+            if let cause = store.player.injury?.cause, cause.isEmpty == false {
+                Text(cause)
+                    .font(theme.type.tagline)
+                    .foregroundStyle(theme.colors.text.color)
+            }
         }
         .accessibilityElement(children: .combine)
     }

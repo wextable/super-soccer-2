@@ -10,7 +10,10 @@ enum WeekBetween {
     static func afterStart(_ player: Player, tuning: WeekTuning = .current) -> Player {
         var player = player
         guard player.injury == nil else { return player }
-        player.condition = max(0, player.condition - tuning.fitnessLossPerStart)
+        player.fitnessDebt += tuning.fitnessDrainMilli(for: player.id)
+        let drop = player.fitnessDebt / 1000
+        player.fitnessDebt %= 1000
+        player.condition = max(0, player.condition - drop)
         return player
     }
 
@@ -125,6 +128,7 @@ enum WeekBetween {
             injurePlayersWhoPlayed(
                 clubIndex: index,
                 playedIDs: playedIDs,
+                opponent: opponentClub(of: next[index].id, among: clubs, scorelines: scorelines),
                 tuning: tuning,
                 rng: &rng,
                 clubs: &next
@@ -290,9 +294,31 @@ enum WeekBetween {
         return gain
     }
 
+    private static func opponentClub(
+        of clubID: String,
+        among clubs: [Club],
+        scorelines: [Matchweek.Scoreline]
+    ) -> Club? {
+        for line in scorelines {
+            let rivalID: String?
+            if line.homeID == clubID {
+                rivalID = line.awayID
+            } else if line.awayID == clubID {
+                rivalID = line.homeID
+            } else {
+                rivalID = nil
+            }
+            if let rivalID, let rival = clubs.first(where: { $0.id == rivalID }) {
+                return rival
+            }
+        }
+        return nil
+    }
+
     private static func injurePlayersWhoPlayed(
         clubIndex: Int,
         playedIDs: Set<Player.ID>,
+        opponent: Club?,
         tuning: WeekTuning,
         rng: inout SeededGenerator,
         clubs: inout [Club]
@@ -315,7 +341,8 @@ enum WeekBetween {
             var hurt = player
             hurt.injury = Player.Injury(
                 label: ailment(using: &rng),
-                weeksLeft: weeks(using: &rng, tuning: tuning)
+                weeksLeft: weeks(using: &rng, tuning: tuning),
+                cause: cause(opponent: opponent, using: &rng)
             )
             hurt.condition = 0
             clubs[clubIndex].players[index] = hurt
@@ -337,6 +364,33 @@ enum WeekBetween {
         ]
         let index = Int.random(in: 0..<labels.count, using: &rng)
         return labels[index]
+    }
+
+    /// The old game named the opponent and the challenge. The sentence says what happened.
+    private static func cause(opponent: Club?, using rng: inout SeededGenerator) -> String {
+        let challenges = [
+            "slid into him with a vengeance.",
+            "trod upon him.",
+            "elbowed him.",
+            "kicked him on purpose.",
+            "punched him.",
+            "pushed him down when the ref wasn't looking.",
+            "accidentally thrashed him.",
+            "caught him late.",
+            "came in high.",
+            "stood on his foot.",
+            "went through the back of him.",
+            "clattered him and he stayed down.",
+        ]
+        let challenge = challenges[Int.random(in: 0..<challenges.count, using: &rng)]
+        guard let opponent else {
+            return "He went down in the challenge and stayed down."
+        }
+        let pool = opponent.starters.isEmpty ? opponent.players : opponent.starters
+        guard let culprit = pool.randomElement(using: &rng) else {
+            return "He went down in the challenge and stayed down."
+        }
+        return "\(opponent.name)'s \(culprit.fullName) \(challenge)"
     }
 
     private static func weeks(using rng: inout SeededGenerator, tuning: WeekTuning) -> Int {

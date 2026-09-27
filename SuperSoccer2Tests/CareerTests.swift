@@ -56,8 +56,9 @@ struct CareerPersistenceTests {
         #expect(savedClub.starters.contains { $0.id == starter.id } == false)
 
         await store.send(.view(.nextFixtureButtonTapped))
+        await finishPresentedWeekSteps(store)
         await store.finish()
-        #expect(writes.withLock { $0 } == 3)
+        #expect(writes.withLock { $0 } >= 3)
         let advanced = try #require(await box.load())
         #expect(advanced.weekIndex == 1)
         #expect(advanced.pending == nil)
@@ -314,6 +315,30 @@ struct CareerPersistenceTests {
         #expect(week.browsedWeekIndex == nil)
         #expect(week.shownWeekIndex == 4)
         #expect(week.weekNumber == 5)
+    }
+
+    @Test func aCareerSavedBeforeInjuryNoticesStillLoads() throws {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let career = Career(matchweek: MatchweekFeature.State(userClubID: season.clubs[0].id, season: season))
+        let data = try JSONEncoder().encode(career)
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "injuryNotices")
+        let stripped = try JSONSerialization.data(withJSONObject: object)
+        let loaded = try JSONDecoder().decode(Career.self, from: stripped)
+        #expect(loaded.injuryNotices.isEmpty)
+        #expect(loaded.userClubID == career.userClubID)
+        #expect(loaded.clubs.count == career.clubs.count)
+    }
+
+    @Test func aSavedPlayerWithoutTheNewFieldsStillLoads() throws {
+        let json = """
+        {"id":"p","firstName":"Bo","lastName":"Queef","position":"forward","condition":90,"isStarter":true,"ratings":{"speed":70,"shooting":70,"passing":70,"dribbling":70,"defending":70,"goalkeeping":70},"xp":4,"skillsEarned":1,"injury":{"label":"dead leg","weeksLeft":2}}
+        """
+        let player = try JSONDecoder().decode(Player.self, from: Data(json.utf8))
+        #expect(player.fitnessDebt == 0)
+        #expect(player.injury?.cause == "")
+        #expect(player.injury?.label == "dead leg")
+        #expect(player.xp == 4)
     }
 }
 

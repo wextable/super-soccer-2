@@ -25,11 +25,13 @@ struct MatchweekFeature {
         /// Skills the user has not spent yet. A week can add zero or several.
         var skillOffers: [SkillOffer]
         var skillChoices: [SkillChoice]
+        var injuryNotices: [InjuryNotice]
         var lineupRevision: Int
         var skillsChosen: Int
         /// Where to go once every open skill has a stat.
         var skillFollowUp: SkillFollowUp?
         @Presents var skillChoice: SkillChoiceFeature.State?
+        @Presents var injuryNotice: InjuryNoticeFeature.State?
         @Presents var highlight: HighlightFeature.State?
         @Presents var stats: MatchStatsFeature.State?
         @Presents var leaders: LeadersFeature.State?
@@ -99,10 +101,12 @@ struct MatchweekFeature {
             tab = .club
             skillOffers = []
             skillChoices = WeekTuning.current.skillChoices
+            injuryNotices = []
             lineupRevision = 0
             skillsChosen = 0
             skillFollowUp = nil
             skillChoice = nil
+            injuryNotice = nil
             highlight = nil
             stats = nil
             leaders = nil
@@ -363,6 +367,7 @@ struct MatchweekFeature {
                 }
             }
             let tuning = WeekTuning.current
+            let userBefore = clubs.first { $0.id == userClubID }?.players ?? []
             let settlement = WeekBetween.settle(
                 clubs: clubs,
                 scorelines: pending.scorelines,
@@ -372,6 +377,13 @@ struct MatchweekFeature {
                 tuning: tuning
             )
             clubs = settlement.clubs
+            if choosesUserSkills == false, let user = clubs.first(where: { $0.id == userClubID }) {
+                injuryNotices.append(contentsOf: InjuryNotice.arriving(
+                    before: userBefore,
+                    after: user.players,
+                    weekIndex: weekIndex
+                ))
+            }
             for offer in settlement.offers {
                 var copy = offer
                 copy.id = "\(weekIndex)|\(offer.id)|\(skillOffers.count)"
@@ -398,6 +410,23 @@ struct MatchweekFeature {
             if let current = player?.player.id, let found = squadPlayer(current) {
                 player = playerDetail(for: found.player, in: found.club)
             }
+            return true
+        }
+
+        /// Shows the next unread injury. The step count stays put as each one is dismissed.
+        @discardableResult
+        mutating func presentNextInjury() -> Bool {
+            guard let notice = injuryNotices.first else {
+                injuryNotice = nil
+                return false
+            }
+            let stepCount = injuryNotice?.stepCount ?? injuryNotices.count
+            let step = (injuryNotice?.step ?? 0) + 1
+            injuryNotice = InjuryNoticeFeature.State(
+                notice: notice,
+                step: step,
+                stepCount: stepCount
+            )
             return true
         }
 
@@ -450,6 +479,7 @@ struct MatchweekFeature {
         case player(PresentationAction<PlayerDetailFeature.Action>)
         case substitution(PresentationAction<SubstitutionFeature.Action>)
         case skillChoice(PresentationAction<SkillChoiceFeature.Action>)
+        case injuryNotice(PresentationAction<InjuryNoticeFeature.Action>)
         case seasonAlert(PresentationAction<SeasonAlert>)
 
         @CasePathable
@@ -541,7 +571,8 @@ struct MatchweekFeature {
                 return .none
 
             case .view(.nextFixtureButtonTapped):
-                guard state.hasNextFixture, state.skillChoice == nil else { return .none }
+                guard state.hasNextFixture, state.skillChoice == nil, state.injuryNotice == nil else { return .none }
+                if beginInjuries(&state, then: .nextWeek) { return .none }
                 if beginSkills(&state, then: .nextWeek) { return .none }
                 advanceWeek(&state)
                 return save(state)
@@ -576,7 +607,10 @@ struct MatchweekFeature {
                 return .none
 
             case .view(.championshipButtonTapped):
-                guard state.seasonIsOver, state.record != nil, state.skillChoice == nil else { return .none }
+                guard state.seasonIsOver, state.record != nil, state.skillChoice == nil, state.injuryNotice == nil else {
+                    return .none
+                }
+                if beginInjuries(&state, then: .championship) { return .none }
                 if beginSkills(&state, then: .championship) { return .none }
                 openChampionship(&state)
                 return .none
@@ -646,6 +680,12 @@ struct MatchweekFeature {
             case .skillChoice:
                 return .none
 
+            case .injuryNotice(.presented(.delegate(.dismissed))):
+                return continueAfterInjuries(&state)
+
+            case .injuryNotice:
+                return .none
+
             case .highlight(.presented(.delegate(.dismissed))):
                 state.highlight = nil
                 state.stats = nil
@@ -706,6 +746,9 @@ struct MatchweekFeature {
         .ifLet(\.$skillChoice, action: \.skillChoice) {
             SkillChoiceFeature()
         }
+        .ifLet(\.$injuryNotice, action: \.injuryNotice) {
+            InjuryNoticeFeature()
+        }
         .ifLet(\.$seasonAlert, action: \.seasonAlert)
     }
 
@@ -739,8 +782,17 @@ struct MatchweekFeature {
         state.player = nil
         state.substitution = nil
         state.skillChoice = nil
+        state.injuryNotice = nil
+        state.injuryNotices = []
         state.skillFollowUp = nil
         state.seasonAlert = nil
+        if state.skillOffers.isEmpty == false {
+            var offers = state.skillOffers
+            var squads = state.clubs
+            WeekBetween.resolveAutomatically(&offers, clubs: &squads)
+            state.skillOffers = offers
+            state.clubs = squads
+        }
         state.browsedWeekIndex = nil
         while !state.seasonIsOver {
             if state.currentWeekIsInTheTable {
@@ -753,6 +805,35 @@ struct MatchweekFeature {
             state.commitPendingWeek(choosesUserSkills: true)
         }
         refreshPresented(&state)
+    }
+
+    private func beginInjuries(_ state: inout State, then followUp: State.SkillFollowUp) -> Bool {
+        guard state.injuryNotice == nil, state.injuryNotices.isEmpty == false else { return false }
+        state.skillFollowUp = followUp
+        return state.presentNextInjury()
+    }
+
+    private func continueAfterInjuries(_ state: inout State) -> Effect<Action> {
+        if state.injuryNotices.isEmpty == false {
+            state.injuryNotices.removeFirst()
+        }
+        if state.presentNextInjury() {
+            return save(state)
+        }
+        let followUp = state.skillFollowUp
+        state.injuryNotice = nil
+        switch followUp {
+        case .nextWeek:
+            if beginSkills(&state, then: .nextWeek) { return save(state) }
+            advanceWeek(&state)
+            return save(state)
+        case .championship:
+            if beginSkills(&state, then: .championship) { return save(state) }
+            openChampionship(&state)
+            return save(state)
+        case nil:
+            return .none
+        }
     }
 
     private func beginSkills(_ state: inout State, then followUp: State.SkillFollowUp) -> Bool {
@@ -780,6 +861,7 @@ struct MatchweekFeature {
         state.team = nil
         state.player = nil
         state.substitution = nil
+        state.injuryNotice = nil
         state.didFail = false
     }
 

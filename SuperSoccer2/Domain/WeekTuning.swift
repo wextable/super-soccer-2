@@ -83,7 +83,7 @@ struct SkillOffer: Codable, Equatable, Sendable, Identifiable {
 /// Weights for the week between matches. A later settings screen can bind each field.
 /// The goal-mean constants stay on `MatchTuning`.
 struct WeekTuning: Equatable, Sendable {
-    /// Fitness a starter loses after the match.
+    /// The most condition a starter loses after the match. Each player drains somewhere from one point up to this, so a side does not change band in the same week.
     var fitnessLossPerStart: Int
     /// Fitness a healthy unused player gains. One week of this clears most of a run into the red.
     var benchRecovery: Int
@@ -113,6 +113,7 @@ struct WeekTuning: Equatable, Sendable {
     var xpForKeeperCleanSheet: Int
     var xpForDefenderCleanSheet: Int
     /// Experience for the first skill. Later skills cost this plus `extraXpPerSkill` times skills already earned.
+    /// The draft places each player somewhere below this, so the same gain does not level the whole side in one week.
     var xpForFirstSkill: Int
     var extraXpPerSkill: Int
     var skillPointsSpeed: Int
@@ -200,6 +201,43 @@ struct WeekTuning: Equatable, Sendable {
 
     func requiredXP(skillsEarned: Int) -> Int {
         xpForFirstSkill + extraXpPerSkill * skillsEarned
+    }
+
+    /// Experience already on the clock when the player is drafted. Below the first skill, and different for each id.
+    func openingXP(for playerID: String) -> Int {
+        let span = max(xpForFirstSkill, 1)
+        return Int(Self.mix(playerID, salt: 0x5850) % UInt64(span))
+    }
+
+    /// Thousandths of a condition point this player loses per start.
+    /// One point at the low end, `fitnessLossPerStart` at the high end. Never the old three-point drop.
+    func fitnessDrainMilli(for playerID: String) -> Int {
+        let ceiling = max(fitnessLossPerStart, 1) * 1000
+        let floor = 1000
+        if ceiling <= floor { return floor }
+        let span = ceiling - floor + 1
+        return floor + Int(Self.mix(playerID, salt: 0x4649) % UInt64(span))
+    }
+
+    /// Condition at the draft. Still green, and not the same number for the whole side.
+    func openingCondition(for playerID: String) -> Int {
+        let room = max(100 - greenMinimum, 1)
+        let span = max(room / 2, 1)
+        let offset = Int(Self.mix(playerID, salt: 0x434F) % UInt64(span))
+        return 100 - offset
+    }
+
+    private static func mix(_ text: String, salt: UInt64) -> UInt64 {
+        var hash: UInt64 = 14_695_981_039_346_656_037 ^ salt
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        hash &+= 0x9E37_79B9_7F4A_7C15
+        var mixed = hash
+        mixed = (mixed ^ (mixed >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        mixed = (mixed ^ (mixed >> 27)) &* 0x94D0_49BB_1331_11EB
+        return mixed ^ (mixed >> 31)
     }
 
     var skillChoices: [SkillChoice] {
