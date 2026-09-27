@@ -62,9 +62,13 @@ struct TeamScreen: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
-            Text(club.name)
-                .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+            HStack(spacing: theme.space.sm) {
+                ClubCrest(clubID: club.id, scale: .mark)
+                Text(club.name)
+                    .font(theme.type.display)
+                    .foregroundStyle(theme.colors.text.color)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
                 if let place {
                     Text("\(LeagueTable.placeWord(place)) in table")

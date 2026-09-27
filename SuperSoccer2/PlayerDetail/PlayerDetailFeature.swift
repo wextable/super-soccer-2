@@ -7,6 +7,7 @@ struct PlayerDetailFeature {
     struct State: Equatable {
         var player: Player
         var clubName: String
+        var clubID: String = ""
     }
 
     enum Action {}

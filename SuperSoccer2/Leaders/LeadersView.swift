@@ -100,9 +100,12 @@ struct LeadersView: View {
                     Text(row.player.fullName)
                         .font(theme.type.playerName)
                         .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.text.color)
-                    Text(isYours(row) ? "Your club · \(row.clubName)" : row.clubName)
-                        .font(theme.type.captionNumber)
-                        .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.secondaryText.color)
+                    HStack(spacing: theme.space.xs) {
+                        ClubCrest(clubID: row.clubID)
+                        Text(isYours(row) ? "Your club · \(row.clubName)" : row.clubName)
+                            .font(theme.type.captionNumber)
+                            .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.secondaryText.color)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text("\(row.count)")

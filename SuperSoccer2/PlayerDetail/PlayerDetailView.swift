@@ -27,9 +27,12 @@ struct PlayerDetailView: View {
             Text(store.player.fullName)
                 .font(theme.type.display)
                 .foregroundStyle(theme.colors.text.color)
-            Text(store.clubName)
-                .font(theme.type.tagline)
-                .foregroundStyle(theme.colors.secondaryText.color)
+            HStack(spacing: theme.space.sm) {
+                ClubCrest(clubID: store.clubID)
+                Text(store.clubName)
+                    .font(theme.type.tagline)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+            }
             Text("Overall \(store.player.overall)")
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)

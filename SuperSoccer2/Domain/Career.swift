@@ -14,4 +14,6 @@ struct Career: Codable, Equatable, Sendable {
     var record: SeasonRecord?
     var skillOffers: [SkillOffer]
     var skillChoices: [SkillChoice]
+    /// Scorelines for weeks already on the table, in week order. Careers saved before paging omit this.
+    var playedWeeks: [[Matchweek.Scoreline]]?
 }

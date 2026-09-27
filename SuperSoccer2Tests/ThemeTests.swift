@@ -26,5 +26,7 @@ struct ThemeTests {
         #expect(colors.fitnessYellow.dark != colors.fitnessOrange.dark)
         #expect(colors.fitnessOrange.dark != colors.fitnessRed.dark)
         #expect(Theme.starbyte.metrics.minimumControl == 44)
+        #expect(Theme.starbyte.metrics.crest > 0)
+        #expect(Theme.starbyte.metrics.crestMark >= Theme.starbyte.metrics.crest)
     }
 }

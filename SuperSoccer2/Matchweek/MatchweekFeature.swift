@@ -9,6 +9,10 @@ struct MatchweekFeature {
         var clubs: [Club]
         var weeks: [[LeagueDraft.Fixture]]
         var weekIndex: Int
+        /// Week the Week screen is showing. Nil follows the season week, so the screen opens on the current week.
+        var browsedWeekIndex: Int?
+        /// Scorelines for weeks already on the table, in week order.
+        var playedWeeks: [[Matchweek.Scoreline]]
         var standings: [Standing]
         var committedWeeks: Int
         var pending: Matchweek.Played?
@@ -83,6 +87,8 @@ struct MatchweekFeature {
             clubs = season.clubs
             weeks = LeagueDraft.weeks(in: season.fixtures)
             weekIndex = 0
+            browsedWeekIndex = nil
+            playedWeeks = []
             standings = LeagueTable.zeros(clubIDs: season.clubs.map(\.id))
             committedWeeks = 0
             pending = nil
@@ -110,6 +116,35 @@ struct MatchweekFeature {
         var weekNumber: Int { weekIndex + 1 }
 
         var nextWeekNumber: Int { weekNumber + 1 }
+
+        /// The week on the Week screen. Paging does not move the season.
+        var shownWeekIndex: Int {
+            let chosen = browsedWeekIndex ?? weekIndex
+            guard weeks.indices.contains(chosen) else { return weekIndex }
+            return chosen
+        }
+
+        var browsedWeekNumber: Int { shownWeekIndex + 1 }
+
+        var weekCount: Int { weeks.count }
+
+        var canBrowseEarlierWeek: Bool { shownWeekIndex > 0 }
+
+        var canBrowseLaterWeek: Bool { shownWeekIndex + 1 < weeks.count }
+
+        var browsingTheCurrentWeek: Bool { shownWeekIndex == weekIndex }
+
+        var browsedWeekHasResults: Bool { storedScorelines(for: shownWeekIndex) != nil }
+
+        private func storedScorelines(for index: Int) -> [Matchweek.Scoreline]? {
+            if playedWeeks.indices.contains(index), !playedWeeks[index].isEmpty {
+                return playedWeeks[index]
+            }
+            if index == weekIndex, currentWeekIsInTheTable, let lines = pending?.scorelines, !lines.isEmpty {
+                return lines
+            }
+            return nil
+        }
 
         var advanceWeekTitle: String { "Advance to week \(nextWeekNumber)" }
 
@@ -232,10 +267,10 @@ struct MatchweekFeature {
         }
 
         var weekLines: [WeekLine] {
-            guard weeks.indices.contains(weekIndex) else { return [] }
-            let played = currentWeekIsInTheTable ? pending?.scorelines ?? [] : []
+            guard weeks.indices.contains(shownWeekIndex) else { return [] }
+            let played = storedScorelines(for: shownWeekIndex) ?? []
             let scores = Dictionary(uniqueKeysWithValues: played.map { ("\($0.homeID)-\($0.awayID)", $0) })
-            return weeks[weekIndex].enumerated().map { offset, fixture in
+            return weeks[shownWeekIndex].enumerated().map { offset, fixture in
                 let score = scores["\(fixture.homeID)-\(fixture.awayID)"]
                 return (
                     offset,
@@ -343,6 +378,9 @@ struct MatchweekFeature {
                 skillOffers.append(copy)
             }
             skillChoices = tuning.skillChoices
+            if playedWeeks.count == weekIndex {
+                playedWeeks.append(pending.scorelines)
+            }
             if choosesUserSkills {
                 var offers = skillOffers
                 var squads = clubs
@@ -382,7 +420,7 @@ struct MatchweekFeature {
         }
 
         func playerDetail(for player: Player, in club: Club) -> PlayerDetailFeature.State {
-            PlayerDetailFeature.State(player: player, clubName: club.name)
+            PlayerDetailFeature.State(player: player, clubName: club.name, clubID: club.id)
         }
 
         func teamScreen(for club: Club) -> TeamFeature.State {
@@ -421,6 +459,8 @@ struct MatchweekFeature {
             case simulateSeasonButtonTapped
             case replayButtonTapped
             case nextFixtureButtonTapped
+            case previousWeekButtonTapped
+            case nextWeekButtonTapped
             case tabSelected(State.Tab)
             case menuButtonTapped
             case leadersButtonTapped
@@ -505,6 +545,16 @@ struct MatchweekFeature {
                 if beginSkills(&state, then: .nextWeek) { return .none }
                 advanceWeek(&state)
                 return save(state)
+
+            case .view(.previousWeekButtonTapped):
+                guard state.canBrowseEarlierWeek else { return .none }
+                state.browsedWeekIndex = state.shownWeekIndex - 1
+                return .none
+
+            case .view(.nextWeekButtonTapped):
+                guard state.canBrowseLaterWeek else { return .none }
+                state.browsedWeekIndex = state.shownWeekIndex + 1
+                return .none
 
             case let .view(.tabSelected(tab)):
                 state.tab = tab
@@ -609,7 +659,9 @@ struct MatchweekFeature {
                     homeShort: pending.home.shortName,
                     awayShort: pending.away.shortName,
                     homeName: pending.home.name,
-                    awayName: pending.away.name
+                    awayName: pending.away.name,
+                    homeID: pending.home.id,
+                    awayID: pending.away.id
                 )
                 return .none
 
@@ -689,6 +741,7 @@ struct MatchweekFeature {
         state.skillChoice = nil
         state.skillFollowUp = nil
         state.seasonAlert = nil
+        state.browsedWeekIndex = nil
         while !state.seasonIsOver {
             if state.currentWeekIsInTheTable {
                 guard state.hasNextFixture else { return }
@@ -718,6 +771,7 @@ struct MatchweekFeature {
 
     private func advanceWeek(_ state: inout State) {
         state.weekIndex += 1
+        state.browsedWeekIndex = nil
         state.pending = nil
         state.highlight = nil
         state.stats = nil
