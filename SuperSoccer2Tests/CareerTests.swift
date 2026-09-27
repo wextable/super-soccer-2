@@ -286,6 +286,35 @@ struct CareerPersistenceTests {
         #expect(restored.standings == career.standings)
         #expect(restored.record == career.record)
         #expect(restored.skillOffers == career.skillOffers)
+        #expect(restored.playedWeeks == career.playedWeeks ?? [])
+        #expect(restored.browsedWeekIndex == nil)
+        #expect(restored.shownWeekIndex == career.weekIndex)
+    }
+
+    @Test func anOlderCareerWithoutPlayedWeeksStillOpensOnTheCurrentWeek() throws {
+        let season = LeagueDraft.makeLeague(seed: 3)
+        var career = Career(matchweek: MatchweekFeature.State(userClubID: "everton", season: season))
+        career.weekIndex = 4
+        career.committedWeeks = 4
+        career.playedWeeks = [[
+            Matchweek.Scoreline(homeID: "everton", awayID: "arsenal", homeScore: 2, awayScore: 1)
+        ]]
+        let encoded = try JSONEncoder().encode(career)
+        let decoded = try JSONDecoder().decode(Career.self, from: encoded)
+        #expect(decoded.playedWeeks?.first?.first?.homeScore == 2)
+
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "playedWeeks")
+        let stripped = try JSONSerialization.data(withJSONObject: object)
+        let older = try JSONDecoder().decode(Career.self, from: stripped)
+        #expect(older.playedWeeks == nil)
+        #expect(older.weekIndex == 4)
+        #expect(older.userClubID == "everton")
+        let week = MatchweekFeature.State(career: older)
+        #expect(week.playedWeeks.isEmpty)
+        #expect(week.browsedWeekIndex == nil)
+        #expect(week.shownWeekIndex == 4)
+        #expect(week.weekNumber == 5)
     }
 
     @Test func aCareerSavedBeforeInjuryNoticesStillLoads() throws {

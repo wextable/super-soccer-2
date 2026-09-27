@@ -16,4 +16,6 @@ struct Career: Codable, Equatable, Sendable {
     var skillChoices: [SkillChoice]
     /// New injuries still unread. Dismissing them is what lets the week move on.
     var injuryNotices: [InjuryNotice] = []
+    /// Scorelines for weeks already on the table, in week order. Careers saved before paging omit this.
+    var playedWeeks: [[Matchweek.Scoreline]]?
 }

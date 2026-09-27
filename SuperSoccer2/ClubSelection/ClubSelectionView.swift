@@ -80,7 +80,8 @@ struct ClubSelectionView: View {
             store.send(.view(.clubTapped(club.id)))
         } label: {
             VStack(alignment: .leading, spacing: theme.space.sm) {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .center, spacing: theme.space.sm) {
+                    ClubCrest(clubID: club.id, scale: .mark)
                     Text(club.name)
                         .font(theme.type.clubName)
                         .foregroundStyle(theme.colors.text.color)

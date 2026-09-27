@@ -66,7 +66,8 @@ struct HighlightView: View {
     }
 
     private var scoreboard: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: theme.space.sm) {
+            ClubCrest(clubID: store.homeID)
             Text(store.homeShort)
                 .font(theme.type.scoreSide)
             Text("\(store.homeScore)")
@@ -82,6 +83,7 @@ struct HighlightView: View {
                 .contentTransition(.numericText())
             Text(store.awayShort)
                 .font(theme.type.scoreSide)
+            ClubCrest(clubID: store.awayID)
             Spacer()
             Text(store.minuteText)
                 .font(theme.type.minute)

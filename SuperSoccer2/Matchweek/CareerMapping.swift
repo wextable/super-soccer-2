@@ -16,6 +16,7 @@ extension Career {
             skillOffers: state.skillOffers,
             skillChoices: state.skillChoices,
             injuryNotices: state.injuryNotices
+            playedWeeks: state.playedWeeks
         )
     }
 }
@@ -78,6 +79,8 @@ extension MatchweekFeature.State {
         clubs = career.clubs
         weeks = career.weeks
         weekIndex = career.weekIndex
+        browsedWeekIndex = nil
+        playedWeeks = career.playedWeeks ?? []
         standings = career.standings
         committedWeeks = career.committedWeeks
         pending = career.pending

@@ -37,10 +37,13 @@ struct ChampionshipView: View {
             Text("Champions")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.score.color)
-            Text(store.championName)
-                .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
-                .multilineTextAlignment(.center)
+            HStack(spacing: theme.space.sm) {
+                ClubCrest(clubID: store.record.championClubID, scale: .mark)
+                Text(store.championName)
+                    .font(theme.type.display)
+                    .foregroundStyle(theme.colors.text.color)
+                    .multilineTextAlignment(.center)
+            }
             Text(store.nickname)
                 .font(theme.type.tagline)
                 .foregroundStyle(theme.colors.secondaryText.color)
@@ -80,9 +83,12 @@ struct ChampionshipView: View {
                                 Text(award.player.fullName)
                                     .font(theme.type.playerName)
                                     .foregroundStyle(isYours(award) ? theme.colors.action.color : theme.colors.text.color)
-                                Text(isYours(award) ? "Your club · \(award.clubName)" : award.clubName)
-                                    .font(theme.type.captionNumber)
-                                    .foregroundStyle(isYours(award) ? theme.colors.action.color : theme.colors.secondaryText.color)
+                                HStack(spacing: theme.space.xs) {
+                                    ClubCrest(clubID: award.clubID)
+                                    Text(isYours(award) ? "Your club · \(award.clubName)" : award.clubName)
+                                        .font(theme.type.captionNumber)
+                                        .foregroundStyle(isYours(award) ? theme.colors.action.color : theme.colors.secondaryText.color)
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             Text(statLine(award))

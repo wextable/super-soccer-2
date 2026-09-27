@@ -18,12 +18,14 @@ struct MatchStatsFeature {
             var name: String
             /// Club of `name`. The attacking club on a goal, the defending club on a save.
             var club: String
+            var clubID: String
             var result: ShotResult
             var isPenalty: Bool
             var isHome: Bool
             var assist: String?
             /// Club of `assist`. The passer plays for the attacking club.
             var assistClub: String?
+            var assistClubID: String?
         }
 
         var homeGoals: Int {
@@ -40,7 +42,9 @@ struct MatchStatsFeature {
             homeShort: String,
             awayShort: String,
             homeName: String,
-            awayName: String
+            awayName: String,
+            homeID: String = "",
+            awayID: String = ""
         ) {
             self.title = title
             self.homeShort = homeShort
@@ -59,17 +63,21 @@ struct MatchStatsFeature {
                     let shot = pair.element
                     let attacking = shot.isHome ? homeName : awayName
                     let defending = shot.isHome ? awayName : homeName
+                    let attackingID = shot.isHome ? homeID : awayID
+                    let defendingID = shot.isHome ? awayID : homeID
                     let isSave = shot.result == .save
                     return Row(
                         id: index,
                         minute: shot.minute,
                         name: isSave ? shot.keeper.fullName : shot.shooter.fullName,
                         club: isSave ? defending : attacking,
+                        clubID: isSave ? defendingID : attackingID,
                         result: shot.result,
                         isPenalty: shot.type == .penalty,
                         isHome: shot.isHome,
                         assist: shot.passer?.fullName,
-                        assistClub: shot.passer == nil ? nil : attacking
+                        assistClub: shot.passer == nil ? nil : attacking,
+                        assistClubID: shot.passer == nil ? nil : attackingID
                     )
                 }
         }

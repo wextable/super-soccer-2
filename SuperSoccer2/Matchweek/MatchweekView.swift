@@ -37,6 +37,7 @@ struct MatchweekView: View {
         .tint(theme.colors.action.color)
         .toolbarBackground(theme.colors.background.color, for: .tabBar)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.weekIndex)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.browsedWeekIndex)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.currentWeekIsInTheTable)
         .navigationDestination(
             item: $store.scope(state: \.leaders, action: \.leaders)
@@ -95,7 +96,7 @@ struct MatchweekView: View {
         case .table:
             "Week \(store.weekNumber)"
         case .week:
-            "Week \(store.weekNumber)"
+            "Week \(store.browsedWeekNumber)"
         case .match:
             "Match"
         }
