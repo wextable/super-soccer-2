@@ -185,6 +185,9 @@ struct MatchweekFeature {
                 .map(\.element)
         }
 
+        /// Heading for the post-match scorers. Club headers and player rows are this match's goals.
+        var matchScorersTitle: String { "Goals" }
+
         /// This match's scorers. The user's club, then the opponent. Empty before the week is on the table.
         var matchScorers: [ScorerGroup] {
             guard currentWeekIsInTheTable, let pending, let user = userClub, let opponent else { return [] }
@@ -591,7 +594,9 @@ struct MatchweekFeature {
                 state.stats = MatchStatsFeature.State(
                     shots: pending.userMatch.shots,
                     homeShort: pending.home.shortName,
-                    awayShort: pending.away.shortName
+                    awayShort: pending.away.shortName,
+                    homeName: pending.home.name,
+                    awayName: pending.away.name
                 )
                 return .none
 

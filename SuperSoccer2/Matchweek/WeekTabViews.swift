@@ -393,29 +393,43 @@ struct MatchTab: View {
     }
 
     private var scorers: some View {
-        VStack(alignment: .leading, spacing: theme.space.lg) {
-            ForEach(store.matchScorers) { group in
-                VStack(alignment: .leading, spacing: theme.space.sm) {
-                    Text(group.clubName)
-                        .font(theme.type.opponentName)
-                        .foregroundStyle(theme.colors.text.color)
-                    if !group.lines.isEmpty {
-                        WeekCard {
-                            ForEach(group.lines) { line in
-                                Text(line.label)
-                                    .font(theme.type.playerName)
-                                    .foregroundStyle(theme.colors.text.color)
-                                    .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
-                                if line.id != group.lines.last?.id {
-                                    WeekHairline()
+        VStack(alignment: .leading, spacing: theme.space.sm) {
+            Text(store.matchScorersTitle)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
+            VStack(alignment: .leading, spacing: theme.space.lg) {
+                ForEach(store.matchScorers) { group in
+                    VStack(alignment: .leading, spacing: theme.space.sm) {
+                        Text(group.clubName)
+                            .font(theme.type.opponentName)
+                            .foregroundStyle(theme.colors.text.color)
+                        if !group.lines.isEmpty {
+                            WeekCard {
+                                ForEach(group.lines) { line in
+                                    Text(line.label)
+                                        .font(theme.type.playerName)
+                                        .foregroundStyle(theme.colors.text.color)
+                                        .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
+                                    if line.id != group.lines.last?.id {
+                                        WeekHairline()
+                                    }
                                 }
                             }
                         }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(scorerGroupLabel(group))
                 }
-                .accessibilityElement(children: .combine)
             }
         }
+    }
+
+    private func scorerGroupLabel(_ group: MatchweekFeature.State.ScorerGroup) -> String {
+        let players = group.lines.map(\.label).joined(separator: ", ")
+        if players.isEmpty {
+            return "\(store.matchScorersTitle), \(group.clubName)"
+        }
+        return "\(store.matchScorersTitle), \(group.clubName), \(players)"
     }
 
     private var controls: some View {

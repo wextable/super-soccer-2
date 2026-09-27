@@ -73,7 +73,7 @@ struct MatchStatsView: View {
     }
 
     private func shotRow(_ row: MatchStatsFeature.State.Row) -> some View {
-        HStack(spacing: theme.space.sm) {
+        HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
             Text("\(row.minute)'")
                 .font(theme.type.minute)
                 .foregroundStyle(theme.colors.secondaryText.color)
@@ -82,8 +82,11 @@ struct MatchStatsView: View {
                 Text(row.name)
                     .font(theme.type.playerName)
                     .foregroundStyle(theme.colors.text.color)
-                if let assist = row.assist {
-                    Text(assist)
+                Text(row.club)
+                    .font(theme.type.captionNumber)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+                if let assist = row.assist, let club = row.assistClub {
+                    Text("\(assist) · \(club)")
                         .font(theme.type.captionNumber)
                         .foregroundStyle(theme.colors.secondaryText.color)
                 }
@@ -99,10 +102,11 @@ struct MatchStatsView: View {
     }
 
     private func shotLabel(_ row: MatchStatsFeature.State.Row) -> String {
-        if let assist = row.assist {
-            return "\(row.minute) minutes, \(row.name), assist \(assist), \(resultLabel(row))"
+        let player = "\(row.name), \(row.club)"
+        if let assist = row.assist, let club = row.assistClub {
+            return "\(row.minute) minutes, \(player), assist \(assist), \(club), \(resultLabel(row))"
         }
-        return "\(row.minute) minutes, \(row.name), \(resultLabel(row))"
+        return "\(row.minute) minutes, \(player), \(resultLabel(row))"
     }
 
     private func resultLabel(_ row: MatchStatsFeature.State.Row) -> String {

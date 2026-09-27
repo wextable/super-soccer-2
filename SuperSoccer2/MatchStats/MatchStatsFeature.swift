@@ -16,10 +16,14 @@ struct MatchStatsFeature {
             var minute: Int
             /// Shooter on a goal. Keeper on a save.
             var name: String
+            /// Club of `name`. The attacking club on a goal, the defending club on a save.
+            var club: String
             var result: ShotResult
             var isPenalty: Bool
             var isHome: Bool
             var assist: String?
+            /// Club of `assist`. The passer plays for the attacking club.
+            var assistClub: String?
         }
 
         var homeGoals: Int {
@@ -30,7 +34,14 @@ struct MatchStatsFeature {
             rows.filter { !$0.isHome && $0.result == .goal }.count
         }
 
-        init(shots: [Shot], title: String = "Full time", homeShort: String, awayShort: String) {
+        init(
+            shots: [Shot],
+            title: String = "Full time",
+            homeShort: String,
+            awayShort: String,
+            homeName: String,
+            awayName: String
+        ) {
             self.title = title
             self.homeShort = homeShort
             self.awayShort = awayShort
@@ -46,14 +57,19 @@ struct MatchStatsFeature {
                 .enumerated()
                 .map { index, pair in
                     let shot = pair.element
+                    let attacking = shot.isHome ? homeName : awayName
+                    let defending = shot.isHome ? awayName : homeName
+                    let isSave = shot.result == .save
                     return Row(
                         id: index,
                         minute: shot.minute,
-                        name: shot.result == .save ? shot.keeper.fullName : shot.shooter.fullName,
+                        name: isSave ? shot.keeper.fullName : shot.shooter.fullName,
+                        club: isSave ? defending : attacking,
                         result: shot.result,
                         isPenalty: shot.type == .penalty,
                         isHome: shot.isHome,
-                        assist: shot.passer?.fullName
+                        assist: shot.passer?.fullName,
+                        assistClub: shot.passer == nil ? nil : attacking
                     )
                 }
         }
