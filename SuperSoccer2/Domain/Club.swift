@@ -40,7 +40,10 @@ struct Club: Codable, Equatable, Sendable, Identifiable {
         players.compactMap { player in
             guard let injury = player.injury else { return nil }
             let weeks = injury.weeksLeft == 1 ? "1 week" : "\(injury.weeksLeft) weeks"
-            return "\(player.fullName) is out · \(injury.label) · \(weeks)"
+            if injury.cause.isEmpty {
+                return "\(player.fullName) is out · \(injury.label) · \(weeks)"
+            }
+            return "\(player.fullName) is out · \(injury.label) · \(injury.cause) · \(weeks)"
         }
         .sorted()
     }

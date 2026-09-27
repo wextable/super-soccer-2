@@ -260,6 +260,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.highlight == nil)
 
         await store.send(.view(.nextFixtureButtonTapped))
+        await finishPresentedWeekSteps(store)
         #expect(store.state.weekIndex == 1)
         #expect(store.state.currentWeekIsInTheTable == false)
         #expect(store.state.pending == nil)
@@ -526,6 +527,7 @@ struct MatchweekFeatureTests {
         #expect(store.state.record == record)
 
         await store.send(.view(.championshipButtonTapped))
+        await finishPresentedWeekSteps(store)
         let championID = record.championClubID
         #expect(store.state.championship?.record == record)
         #expect(store.state.championship?.goals.map(\.player.id) == store.state.goalLeaders.filter { $0.clubID == championID }.map(\.player.id))

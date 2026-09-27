@@ -108,6 +108,8 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     struct Injury: Codable, Equatable, Sendable {
         var label: String
         var weeksLeft: Int
+        /// What happened. An opponent and the challenge, not only the ailment.
+        var cause: String = ""
     }
 
     var id: String
@@ -122,6 +124,8 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     /// Skills already spent. The next skill costs more.
     var skillsEarned: Int = 0
     var injury: Injury? = nil
+    /// Thousandths of a condition point still to come off. Personal drain uses this.
+    var fitnessDebt: Int = 0
 
     var fullName: String {
         if firstName.isEmpty {
@@ -164,5 +168,73 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     private func adjusted(_ rating: Int) -> Int {
         let scale = WeekTuning.current.ratingScale(for: fitnessBand())
         return Int(Double(rating) * scale)
+    }
+}
+
+extension Player.Injury {
+    private enum CodingKeys: String, CodingKey {
+        case label
+        case weeksLeft
+        case cause
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        label = try container.decode(String.self, forKey: .label)
+        weeksLeft = try container.decode(Int.self, forKey: .weeksLeft)
+        cause = try container.decodeIfPresent(String.self, forKey: .cause) ?? ""
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(label, forKey: .label)
+        try container.encode(weeksLeft, forKey: .weeksLeft)
+        try container.encode(cause, forKey: .cause)
+    }
+}
+
+extension Player {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case firstName
+        case lastName
+        case position
+        case condition
+        case isStarter
+        case ratings
+        case xp
+        case skillsEarned
+        case injury
+        case fitnessDebt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        firstName = try container.decode(String.self, forKey: .firstName)
+        lastName = try container.decode(String.self, forKey: .lastName)
+        position = try container.decode(Position.self, forKey: .position)
+        condition = try container.decode(Int.self, forKey: .condition)
+        isStarter = try container.decodeIfPresent(Bool.self, forKey: .isStarter) ?? false
+        ratings = try container.decode(Ratings.self, forKey: .ratings)
+        xp = try container.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        skillsEarned = try container.decodeIfPresent(Int.self, forKey: .skillsEarned) ?? 0
+        injury = try container.decodeIfPresent(Injury.self, forKey: .injury)
+        fitnessDebt = try container.decodeIfPresent(Int.self, forKey: .fitnessDebt) ?? 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(firstName, forKey: .firstName)
+        try container.encode(lastName, forKey: .lastName)
+        try container.encode(position, forKey: .position)
+        try container.encode(condition, forKey: .condition)
+        try container.encode(isStarter, forKey: .isStarter)
+        try container.encode(ratings, forKey: .ratings)
+        try container.encode(xp, forKey: .xp)
+        try container.encode(skillsEarned, forKey: .skillsEarned)
+        try container.encodeIfPresent(injury, forKey: .injury)
+        try container.encode(fitnessDebt, forKey: .fitnessDebt)
     }
 }

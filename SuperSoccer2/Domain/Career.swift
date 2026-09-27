@@ -14,4 +14,6 @@ struct Career: Codable, Equatable, Sendable {
     var record: SeasonRecord?
     var skillOffers: [SkillOffer]
     var skillChoices: [SkillChoice]
+    /// New injuries still unread. Dismissing them is what lets the week move on.
+    var injuryNotices: [InjuryNotice] = []
 }
