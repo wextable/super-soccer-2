@@ -12,11 +12,8 @@ struct ClubTab: View {
                 points: store.userStanding?.points ?? 0,
                 goalDifference: store.userStanding?.goalDifference ?? 0,
                 canManage: true,
-                offers: store.skillOffers,
-                choices: store.skillChoices,
                 onPlayer: { store.send(.view(.playerTapped($0))) },
-                onRest: { store.send(.view(.restStarter($0))) },
-                onSkill: { store.send(.view(.skillStatTapped($0, $1))) }
+                onRest: { store.send(.view(.restStarter($0))) }
             )
         } else {
             TeamMissing()
@@ -59,7 +56,7 @@ struct TableTab: View {
                     .buttonStyle(ThemeActionButtonStyle())
                 }
                 WeekCard {
-                    tableRow(club: "Club", played: "P", points: "Pts", difference: "GD", emphasized: false, isHeader: true)
+                    tableRow(club: "Club", record: "W/L/D", points: "Pts", difference: "GD", emphasized: false, isHeader: true)
                     ForEach(store.table) { row in
                         WeekHairline()
                         let club = store.clubs.first { $0.id == row.clubID }
@@ -68,7 +65,7 @@ struct TableTab: View {
                         } label: {
                             tableRow(
                                 club: club?.name ?? row.clubID,
-                                played: "\(row.played)",
+                                record: row.recordLine,
                                 points: "\(row.points)",
                                 difference: signedGoalDifference(row.goalDifference),
                                 emphasized: row.clubID == store.userClubID,
@@ -88,7 +85,7 @@ struct TableTab: View {
 
     private func tableRow(
         club: String,
-        played: String,
+        record: String,
         points: String,
         difference: String,
         emphasized: Bool,
@@ -101,8 +98,10 @@ struct TableTab: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(played)
-                .frame(width: theme.metrics.minimumControl, alignment: .trailing)
+            Text(record)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(minWidth: theme.metrics.minimumControl + theme.space.lg, alignment: .trailing)
             Text(points)
                 .frame(width: theme.metrics.minimumControl, alignment: .trailing)
             Text(difference)
@@ -120,7 +119,7 @@ struct TableTab: View {
 
     private func tableLabel(row: Standing, club: Club?) -> String {
         let name = club?.name ?? row.clubID
-        return "\(name), played \(row.played), \(row.points) points, goal difference \(signedGoalDifference(row.goalDifference))"
+        return "\(name), \(row.won) wins, \(row.lost) losses, \(row.drawn) draws, \(row.points) points, goal difference \(signedGoalDifference(row.goalDifference))"
     }
 }
 
@@ -360,20 +359,26 @@ struct MatchTab: View {
                                 .font(theme.type.playerName)
                                 .foregroundStyle(theme.colors.text.color)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text("\(player.overall)")
-                                .font(theme.type.playerOverall)
-                                .foregroundStyle(theme.colors.text.color)
+                            StarterRating(player: player)
                         }
                         .frame(minHeight: theme.metrics.minimumControl)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(player.fullName), \(player.position.label), overall \(player.overall)")
+                    .accessibilityLabel(keyPlayerLabel(player))
                     if player.id != store.keyPlayers.last?.id {
                         WeekHairline()
                     }
                 }
             }
         }
+    }
+
+    private func keyPlayerLabel(_ player: Player) -> String {
+        var label = "\(player.fullName), \(player.position.label), overall \(player.overall)"
+        if player.injury == nil, player.overall != player.optimalOverall {
+            label += ", full fitness \(player.optimalOverall)"
+        }
+        return label
     }
 
     private var controls: some View {

@@ -37,6 +37,8 @@ extension MatchweekFeature.State {
         skillChoices = career.skillChoices
         lineupRevision = 0
         skillsChosen = 0
+        skillFollowUp = nil
+        skillChoice = nil
         highlight = nil
         stats = nil
         leaders = nil

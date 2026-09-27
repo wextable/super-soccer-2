@@ -34,6 +34,7 @@ extension Theme {
         var danger: AppearanceColor
         var fitnessGreen: AppearanceColor
         var fitnessYellow: AppearanceColor
+        var fitnessOrange: AppearanceColor
         var fitnessRed: AppearanceColor
         /// Commentary stays the bright cyan on a near-black strip in both appearances.
         var ticker: AppearanceColor
@@ -54,6 +55,7 @@ extension Theme {
             danger: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 99, 99)),
             fitnessGreen: AppearanceColor(light: .byte(15, 110, 52), dark: .byte(102, 220, 140)),
             fitnessYellow: AppearanceColor(light: .byte(140, 84, 0), dark: .byte(255, 196, 72)),
+            fitnessOrange: AppearanceColor(light: .byte(174, 68, 8), dark: .byte(255, 146, 48)),
             fitnessRed: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 120, 110)),
             ticker: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
             tickerBackground: AppearanceColor(light: .byte(7, 17, 12), dark: .byte(7, 17, 12))
@@ -179,6 +181,17 @@ struct RGB: Equatable, Sendable {
 
 extension EnvironmentValues {
     @Entry var theme: Theme = .starbyte
+}
+
+extension Theme.Colors {
+    func fitness(_ band: FitnessBand) -> Color {
+        switch band {
+        case .green: fitnessGreen.color
+        case .yellow: fitnessYellow.color
+        case .orange: fitnessOrange.color
+        case .red: fitnessRed.color
+        }
+    }
 }
 
 extension KitColor {

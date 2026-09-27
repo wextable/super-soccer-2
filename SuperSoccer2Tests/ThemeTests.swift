@@ -18,9 +18,13 @@ struct ThemeTests {
         #expect(colors.danger.light != colors.action.light)
         #expect(colors.fitnessGreen.light != colors.fitnessGreen.dark)
         #expect(colors.fitnessYellow.light != colors.fitnessYellow.dark)
+        #expect(colors.fitnessOrange.light != colors.fitnessOrange.dark)
         #expect(colors.fitnessRed.light != colors.fitnessRed.dark)
         #expect(colors.fitnessGreen.light != colors.fitnessYellow.light)
-        #expect(colors.fitnessYellow.light != colors.fitnessRed.light)
+        #expect(colors.fitnessYellow.light != colors.fitnessOrange.light)
+        #expect(colors.fitnessOrange.light != colors.fitnessRed.light)
+        #expect(colors.fitnessYellow.dark != colors.fitnessOrange.dark)
+        #expect(colors.fitnessOrange.dark != colors.fitnessRed.dark)
         #expect(Theme.starbyte.metrics.minimumControl == 44)
     }
 }

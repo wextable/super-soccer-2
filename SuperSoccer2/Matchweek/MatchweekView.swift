@@ -54,6 +54,11 @@ struct MatchweekView: View {
         ) { highlightStore in
             MatchLineView(week: store, highlight: highlightStore)
         }
+        .fullScreenCover(
+            item: $store.scope(state: \.skillChoice, action: \.skillChoice)
+        ) { skillStore in
+            SkillChoiceView(store: skillStore)
+        }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.committedWeeks)
         .sensoryFeedback(.selection, trigger: store.lineupRevision)
         .sensoryFeedback(.success, trigger: store.skillsChosen)

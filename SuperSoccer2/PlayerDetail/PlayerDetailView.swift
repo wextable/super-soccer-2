@@ -36,6 +36,11 @@ struct PlayerDetailView: View {
             Text("Overall \(store.player.overall)")
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)
+            if showsFitnessDrop {
+                Text("Full fitness \(store.player.optimalOverall)")
+                    .font(theme.type.homeLine)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+            }
             Text(fitnessLine)
                 .font(theme.type.homeLine)
                 .foregroundStyle(fitnessColor)
@@ -48,11 +53,19 @@ struct PlayerDetailView: View {
             Text("Bring in")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.secondaryText.color)
-            Button("Rest, bring in \(bestFit.fullName)") {
+            Button {
                 store.send(.view(.bestFitTapped))
+            } label: {
+                VStack(spacing: theme.space.xxs) {
+                    Text("Rest, bring in \(bestFit.fullName)")
+                    Text("\(bestFit.overall) · \(bestFit.fitnessBand().label) \(bestFit.condition)")
+                        .font(theme.type.captionNumber)
+                }
             }
             .buttonStyle(ThemeActionButtonStyle())
-            .accessibilityLabel("Rest \(store.player.fullName) and bring in \(bestFit.fullName)")
+            .accessibilityLabel(
+                "Rest \(store.player.fullName) and bring in \(bestFit.fullName), overall \(bestFit.overall), \(bestFit.fitnessBand().label), fitness \(bestFit.condition)"
+            )
             if !store.alternatives.isEmpty {
                 Text("Or someone else")
                     .font(theme.type.eyebrow)
@@ -62,11 +75,20 @@ struct PlayerDetailView: View {
                         Button {
                             store.send(.view(.alternativeTapped(player.id)))
                         } label: {
-                            HStack {
-                                Text(player.fullName)
-                                    .font(theme.type.playerName)
-                                    .foregroundStyle(theme.colors.text.color)
-                                Spacer()
+                            HStack(spacing: theme.space.sm) {
+                                Circle()
+                                    .fill(theme.colors.fitness(player.fitnessBand()))
+                                    .frame(width: theme.space.sm, height: theme.space.sm)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: theme.space.xxs) {
+                                    Text(player.fullName)
+                                        .font(theme.type.playerName)
+                                        .foregroundStyle(theme.colors.text.color)
+                                    Text("\(player.fitnessBand().label) · \(player.condition)")
+                                        .font(theme.type.captionNumber)
+                                        .foregroundStyle(theme.colors.fitness(player.fitnessBand()))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 Text("\(player.overall)")
                                     .font(theme.type.playerOverall)
                                     .foregroundStyle(theme.colors.text.color)
@@ -74,7 +96,9 @@ struct PlayerDetailView: View {
                             .frame(minHeight: theme.metrics.minimumControl)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Bring in \(player.fullName), overall \(player.overall)")
+                        .accessibilityLabel(
+                            "Bring in \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
+                        )
                         if index < store.alternatives.count - 1 {
                             WeekHairline()
                         }
@@ -123,21 +147,18 @@ struct PlayerDetailView: View {
         return "\(store.player.fitnessBand().label) · fitness \(store.player.condition)"
     }
 
+    private var showsFitnessDrop: Bool {
+        store.player.isStarter
+            && store.player.injury == nil
+            && store.player.overall != store.player.optimalOverall
+    }
+
     private var fitnessColor: Color {
         if store.player.injury != nil { return theme.colors.fitnessRed.color }
-        switch store.player.fitnessBand() {
-        case .green: return theme.colors.fitnessGreen.color
-        case .yellow: return theme.colors.fitnessYellow.color
-        case .red: return theme.colors.fitnessRed.color
-        }
+        return theme.colors.fitness(store.player.fitnessBand())
     }
 
     private var positionName: String {
-        switch store.player.position {
-        case .keeper: "Keeper"
-        case .defender: "Defender"
-        case .midfielder: "Midfielder"
-        case .forward: "Forward"
-        }
+        store.player.position.title
     }
 }
