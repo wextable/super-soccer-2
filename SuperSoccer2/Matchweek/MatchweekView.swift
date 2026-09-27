@@ -25,6 +25,15 @@ struct MatchweekView: View {
         .themeScreen()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Menu") {
+                    store.send(.view(.menuButtonTapped))
+                }
+                .accessibilityHint("Opens the main menu")
+            }
+        }
         .tint(theme.colors.action.color)
         .toolbarBackground(theme.colors.background.color, for: .tabBar)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.weekIndex)

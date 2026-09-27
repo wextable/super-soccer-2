@@ -23,17 +23,46 @@ struct AppView: View {
     private let theme = Theme.starbyte
 
     var body: some View {
-        NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
-            FrontDoorView(store: store.scope(state: \.frontDoor, action: \.frontDoor))
-        } destination: { store in
-            switch store.case {
-            case let .selection(store):
-                ClubSelectionView(store: store)
-            case let .matchweek(store):
-                MatchweekView(store: store)
+        root
+            .tint(theme.colors.action.color)
+            .environment(\.theme, theme)
+    }
+
+    /// No career yet: the front door is the first screen. A career makes the tab bar the root.
+    /// Team selection and the menu are presented over that root, so neither can be popped back to.
+    @ViewBuilder
+    private var root: some View {
+        if let gameStore = store.scope(state: \.game, action: \.game) {
+            NavigationStack {
+                MatchweekView(store: gameStore)
+            }
+            .sheet(item: $store.scope(state: \.menu, action: \.menu)) { menuStore in
+                menu(menuStore)
+            }
+        } else {
+            NavigationStack {
+                FrontDoorView(store: store.scope(state: \.frontDoor, action: \.frontDoor))
+            }
+            .sheet(item: $store.scope(state: \.selection, action: \.selection)) { selectionStore in
+                clubSelection(selectionStore)
             }
         }
-        .tint(theme.colors.action.color)
+    }
+
+    private func menu(_ menuStore: StoreOf<FrontDoorFeature>) -> some View {
+        NavigationStack {
+            FrontDoorView(store: menuStore)
+        }
+        .sheet(item: $store.scope(state: \.selection, action: \.selection)) { selectionStore in
+            clubSelection(selectionStore)
+        }
+        .environment(\.theme, theme)
+    }
+
+    private func clubSelection(_ selectionStore: StoreOf<ClubSelectionFeature>) -> some View {
+        NavigationStack {
+            ClubSelectionView(store: selectionStore)
+        }
         .environment(\.theme, theme)
     }
 }

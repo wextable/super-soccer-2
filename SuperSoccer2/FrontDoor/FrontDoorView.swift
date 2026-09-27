@@ -18,6 +18,16 @@ struct FrontDoorView: View {
         .themeScreen()
         .navigationTitle("Super Soccer")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if store.mode == .menu {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        store.send(.view(.dismissButtonTapped))
+                    }
+                    .accessibilityHint("Closes the menu and returns to the season")
+                }
+            }
+        }
         .tint(theme.colors.action.color)
         .onAppear { store.send(.view(.onAppear)) }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.canContinue)
@@ -61,8 +71,13 @@ struct FrontDoorView: View {
                         store.send(.view(.continueButtonTapped))
                     }
                     .buttonStyle(ThemeActionButtonStyle())
-                    .disabled(store.isOpening)
-                    .accessibilityHint("Opens the saved career on the club tab")
+                    .disabled(store.isOpening || store.mode == .menu)
+                    .opacity(store.mode == .menu ? 0.45 : 1)
+                    .accessibilityHint(
+                        store.mode == .menu
+                            ? "You are already in this career"
+                            : "Opens the saved career on the club tab"
+                    )
                     Button("New Game") {
                         store.send(.view(.newGameButtonTapped))
                     }
