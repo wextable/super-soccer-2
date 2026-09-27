@@ -294,12 +294,22 @@ struct MatchweekFeatureTests {
         await store.send(.highlight(.presented(.view(.statsButtonTapped))))
         await store.skipReceivedActions()
         let rows = try #require(store.state.stats?.rows)
+        let home = try #require(store.state.pending?.home)
+        let away = try #require(store.state.pending?.away)
         #expect(store.state.highlight != nil)
         #expect(store.state.stats?.title == "Full time")
         #expect(rows.map(\.minute) == listedShots(shots).map(\.minute))
         #expect(rows.map(\.result) == listedShots(shots).map(\.result))
         #expect(rows.map(\.name) == listedShots(shots).map { shot in
             shot.result == .save ? shot.keeper.fullName : shot.shooter.fullName
+        })
+        #expect(rows.map(\.club) == listedShots(shots).map { shot in
+            let attacking = shot.isHome ? home.name : away.name
+            let defending = shot.isHome ? away.name : home.name
+            return shot.result == .save ? defending : attacking
+        })
+        #expect(rows.map(\.assistClub) == listedShots(shots).map { shot in
+            shot.passer == nil ? nil : (shot.isHome ? home.name : away.name)
         })
         #expect(rows.allSatisfy { $0.result != .miss })
         #expect(store.state.standings.allSatisfy { $0.played == 0 })
@@ -810,6 +820,7 @@ private func expectScorerGroups(userClubID: String, season: LeagueDraft.Season) 
     state.committedWeeks = 1
 
     let groups = state.matchScorers
+    #expect(state.matchScorersTitle == "Goals")
     #expect(groups.map(\.clubName) == [user.name, opponent.name])
     let userLines = try #require(groups.first)
     let opponentLines = try #require(groups.last)

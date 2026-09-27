@@ -414,12 +414,16 @@ struct MatchStatsTests {
                 makeShot(id: 1, minute: 18, result: .goal, type: .penalty, shooter: "Bo Scaramucci")
             ],
             homeShort: "MCI",
-            awayShort: "NOR"
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City"
         )
         #expect(state.title == "Full time")
         #expect(state.rows.map(\.minute) == [18, 44])
         #expect(state.rows.map(\.result) == [.goal, .goal])
         #expect(state.rows.map(\.name) == ["Bo Scaramucci", "Queef Pistacio"])
+        #expect(state.rows.map(\.club) == ["Manchester City", "Norwich City"])
+        #expect(state.rows.map(\.assistClub) == [nil, nil])
         #expect(state.rows.map(\.isPenalty) == [true, false])
         #expect(state.homeGoals == 1)
         #expect(state.awayGoals == 1)
@@ -433,11 +437,15 @@ struct MatchStatsTests {
                 makeShot(id: 2, minute: 40, result: .goal, shooter: "Queef Pistacio", keeper: "Hank Keeper", isHome: false)
             ],
             homeShort: "MCI",
-            awayShort: "NOR"
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City"
         )
         #expect(state.rows.map(\.result) == [.save, .goal])
         #expect(state.rows.map(\.name) == ["Udder Quartz", "Queef Pistacio"])
+        #expect(state.rows.map(\.club) == ["Norwich City", "Norwich City"])
         #expect(state.rows.map(\.assist) == [nil, nil])
+        #expect(state.rows.map(\.assistClub) == [nil, nil])
         #expect(state.rows.allSatisfy { $0.result != .miss })
         #expect(state.homeGoals == 0)
         #expect(state.awayGoals == 1)
@@ -450,10 +458,32 @@ struct MatchStatsTests {
                 makeShot(id: 1, minute: 20, result: .save, shooter: "Ada Striker", passer: "Hank Buckwalter", keeper: "Udder Quartz")
             ],
             homeShort: "MCI",
-            awayShort: "NOR"
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City"
         )
         #expect(state.rows.map(\.name) == ["Bo Scaramucci", "Udder Quartz"])
+        #expect(state.rows.map(\.club) == ["Manchester City", "Norwich City"])
         #expect(state.rows.map(\.assist) == ["Chode Magnusson", "Hank Buckwalter"])
+        #expect(state.rows.map(\.assistClub) == ["Manchester City", "Manchester City"])
+    }
+
+    @Test func aSaveNamesTheKeepersClubAndAGoalNamesTheScorers() {
+        let state = MatchStatsFeature.State(
+            shots: [
+                makeShot(id: 0, minute: 12, result: .goal, shooter: "Bo Scaramucci", passer: "Chode Magnusson", isHome: true),
+                makeShot(id: 1, minute: 20, result: .save, shooter: "Ada Striker", passer: "Hank Buckwalter", keeper: "Udder Quartz", isHome: false),
+                makeShot(id: 2, minute: 40, result: .goal, shooter: "Queef Pistacio", isHome: false)
+            ],
+            homeShort: "MCI",
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City"
+        )
+        #expect(state.rows.map(\.name) == ["Bo Scaramucci", "Udder Quartz", "Queef Pistacio"])
+        #expect(state.rows.map(\.club) == ["Manchester City", "Manchester City", "Norwich City"])
+        #expect(state.rows.map(\.assist) == ["Chode Magnusson", "Hank Buckwalter", nil])
+        #expect(state.rows.map(\.assistClub) == ["Manchester City", "Norwich City", nil])
     }
 }
 
