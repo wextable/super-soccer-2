@@ -323,9 +323,11 @@ struct CareerPersistenceTests {
         let data = try JSONEncoder().encode(career)
         var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         object.removeValue(forKey: "injuryNotices")
+        object.removeValue(forKey: "returnNotices")
         let stripped = try JSONSerialization.data(withJSONObject: object)
         let loaded = try JSONDecoder().decode(Career.self, from: stripped)
         #expect(loaded.injuryNotices.isEmpty)
+        #expect(loaded.returnNotices.isEmpty)
         #expect(loaded.userClubID == career.userClubID)
         #expect(loaded.clubs.count == career.clubs.count)
     }
@@ -339,6 +341,8 @@ struct CareerPersistenceTests {
         #expect(player.injury?.cause == "")
         #expect(player.injury?.label == "dead leg")
         #expect(player.xp == 4)
+        #expect(player.level == 1)
+        #expect(player.skillsEarned == 1)
     }
 }
 

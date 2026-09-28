@@ -9,6 +9,9 @@ struct PlayerDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
+                if store.showsExperience {
+                    experience
+                }
                 ratings
             }
             .padding(theme.space.lg)
@@ -51,6 +54,22 @@ struct PlayerDetailView: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var experience: some View {
+        let progress = ExperienceProgress.make(player: store.player)
+        return WeekCard {
+            HStack(spacing: theme.space.sm) {
+                RatingLabel(text: "Level \(progress.level)")
+                RatingBar(track: progress.track, mark: .condition)
+                ExperienceReading(reading: progress.reading)
+            }
+            .frame(minHeight: theme.metrics.minimumControl)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "Level \(progress.level), \(progress.current) of \(progress.required) experience, \(progress.remaining) to the next level"
+        )
     }
 
     private var ratings: some View {
@@ -109,4 +128,26 @@ struct PlayerDetailView: View {
     private var positionName: String {
         store.player.position.title
     }
+}
+
+/// `40/110`. The column stays as wide as a three-digit fraction so the bar keeps one right edge.
+private struct ExperienceReading: View {
+    @Environment(\.theme) private var theme
+    var reading: String
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Text(Self.widest)
+                .font(theme.type.playerOverall)
+                .lineLimit(1)
+                .hidden()
+            Text(reading)
+                .font(theme.type.playerOverall)
+                .foregroundStyle(theme.colors.text.color)
+                .lineLimit(1)
+        }
+        .accessibilityHidden(true)
+    }
+
+    static let widest = "999/999"
 }

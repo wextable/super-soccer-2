@@ -251,8 +251,8 @@ enum WeekBetween {
             )
             if isUser {
                 var pending = 0
-                while player.xp >= tuning.requiredXP(skillsEarned: player.skillsEarned + pending) {
-                    let required = tuning.requiredXP(skillsEarned: player.skillsEarned + pending)
+                while player.xp >= tuning.requiredXP(level: player.level + pending) {
+                    let required = tuning.requiredXP(level: player.level + pending)
                     player.xp -= required
                     offers.append(
                         SkillOffer(
@@ -264,8 +264,8 @@ enum WeekBetween {
                     pending += 1
                 }
             } else {
-                while player.xp >= tuning.requiredXP(skillsEarned: player.skillsEarned) {
-                    player.xp -= tuning.requiredXP(skillsEarned: player.skillsEarned)
+                while player.xp >= tuning.requiredXP(level: player.level) {
+                    player.xp -= tuning.requiredXP(level: player.level)
                     add(PlayerStat.preferred(for: player.position), to: &player, tuning: tuning)
                 }
             }
@@ -432,5 +432,6 @@ enum WeekBetween {
             player.ratings.goalkeeping = min(99, player.ratings.goalkeeping + points)
         }
         player.skillsEarned += 1
+        player.level += 1
     }
 }

@@ -74,6 +74,11 @@ struct MatchweekView: View {
         ) { noticeStore in
             InjuryNoticeView(store: noticeStore)
         }
+        .sheet(
+            item: $store.scope(state: \.returnNotice, action: \.returnNotice)
+        ) { noticeStore in
+            ReturnNoticeView(store: noticeStore)
+        }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.committedWeeks)
         .sensoryFeedback(.selection, trigger: store.lineupRevision)
         .sensoryFeedback(.success, trigger: store.skillsChosen)

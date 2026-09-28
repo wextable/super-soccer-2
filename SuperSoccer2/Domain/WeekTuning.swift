@@ -112,7 +112,7 @@ struct WeekTuning: Equatable, Sendable {
     var xpForSave: Int
     var xpForKeeperCleanSheet: Int
     var xpForDefenderCleanSheet: Int
-    /// Experience for the first skill. Later skills cost this plus `extraXpPerSkill` times skills already earned.
+    /// Experience for the first level. Later levels cost this plus `extraXpPerSkill` times levels already earned.
     /// The draft places each player somewhere below this, so the same gain does not level the whole side in one week.
     var xpForFirstSkill: Int
     var extraXpPerSkill: Int
@@ -199,8 +199,9 @@ struct WeekTuning: Equatable, Sendable {
         }
     }
 
-    func requiredXP(skillsEarned: Int) -> Int {
-        xpForFirstSkill + extraXpPerSkill * skillsEarned
+    /// Experience still to earn before the next level. Level 0 costs `xpForFirstSkill`. Each level after that costs ten more at the shipped tuning.
+    func requiredXP(level: Int) -> Int {
+        xpForFirstSkill + extraXpPerSkill * level
     }
 
     /// Experience already on the clock when the player is drafted. Below the first skill, and different for each id.
