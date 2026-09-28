@@ -10,6 +10,11 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<MatchweekFeature>) async {
             await store.skipReceivedActions()
             continue
         }
+        if store.state.returnNotice != nil {
+            await store.send(.returnNotice(.presented(.view(.continueTapped))))
+            await store.skipReceivedActions()
+            continue
+        }
         if let choice = store.state.skillChoice {
             let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) + $0.points <= 99 }?.stat
                 ?? choice.choices[0].stat
@@ -26,6 +31,11 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<AppFeature>) async {
     for _ in 0..<48 {
         if store.state.game?.injuryNotice != nil {
             await store.send(.game(.injuryNotice(.presented(.view(.continueTapped)))))
+            await store.skipReceivedActions()
+            continue
+        }
+        if store.state.game?.returnNotice != nil {
+            await store.send(.game(.returnNotice(.presented(.view(.continueTapped)))))
             await store.skipReceivedActions()
             continue
         }

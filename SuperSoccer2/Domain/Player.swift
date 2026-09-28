@@ -121,6 +121,8 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     var isStarter: Bool = false
     var ratings: Ratings
     var xp: Int = 0
+    /// Levels already earned. The next level costs more than this one.
+    var level: Int = 0
     /// Skills already spent. The next skill costs more.
     var skillsEarned: Int = 0
     var injury: Injury? = nil
@@ -203,6 +205,7 @@ extension Player {
         case isStarter
         case ratings
         case xp
+        case level
         case skillsEarned
         case injury
         case fitnessDebt
@@ -219,6 +222,7 @@ extension Player {
         ratings = try container.decode(Ratings.self, forKey: .ratings)
         xp = try container.decodeIfPresent(Int.self, forKey: .xp) ?? 0
         skillsEarned = try container.decodeIfPresent(Int.self, forKey: .skillsEarned) ?? 0
+        level = try container.decodeIfPresent(Int.self, forKey: .level) ?? skillsEarned
         injury = try container.decodeIfPresent(Injury.self, forKey: .injury)
         fitnessDebt = try container.decodeIfPresent(Int.self, forKey: .fitnessDebt) ?? 0
     }
@@ -233,6 +237,7 @@ extension Player {
         try container.encode(isStarter, forKey: .isStarter)
         try container.encode(ratings, forKey: .ratings)
         try container.encode(xp, forKey: .xp)
+        try container.encode(level, forKey: .level)
         try container.encode(skillsEarned, forKey: .skillsEarned)
         try container.encodeIfPresent(injury, forKey: .injury)
         try container.encode(fitnessDebt, forKey: .fitnessDebt)

@@ -108,12 +108,78 @@ struct WeekBetweenTests {
         let club = try #require(settlement.clubs.first { $0.id == "user" })
         let hurtPlayer = try #require(club.players.first { $0.id == "hurt" })
         let injury = try #require(hurtPlayer.injury)
-        #expect(club.injuryLines.contains { $0.contains("Bo Queef") && $0.contains("is out") && $0.contains(injury.cause) })
+        let weeks = injury.weeksLeft == 1 ? "1 week" : "\(injury.weeksLeft) weeks"
+        #expect(club.injuryLines.contains("Bo Queef · \(injury.label) · \(weeks)"))
+        #expect(club.injuryLines.allSatisfy { $0.contains(injury.cause) == false })
         #expect(injury.cause.contains("other's"))
         #expect(injury.cause.hasSuffix("."))
         #expect(club.starters.contains { $0.id == "cover" })
         #expect(club.starters.contains { $0.id == "hurt" } == false)
         #expect(club.players.first { $0.id == "hurt" }?.injury != nil)
+    }
+
+    @Test func aHealedPlayerReturnsAtTheNextWeekAndLeavesTheInjuryList() throws {
+        var tuning = WeekTuning.current
+        tuning.injuryChanceGreen = 0
+        tuning.injuryChanceYellow = 0
+        tuning.injuryChanceOrange = 0
+        tuning.injuryChanceRed = 0
+        var hurt = squadPlayer(id: "hurt", position: .defender, starter: false)
+        hurt.injury = Player.Injury(
+            label: "dead leg",
+            weeksLeft: 1,
+            cause: "Arsenal's Bo Queef elbowed him."
+        )
+        let keeper = squadPlayer(id: "keeper", position: .keeper, starter: true)
+        let side = sampleClub(id: "user", players: [keeper, hurt])
+        let opponent = sampleClub(id: "other", players: [squadPlayer(id: "away-keeper", position: .keeper, starter: true)])
+        let before = side.players
+        let settlement = WeekBetween.settle(
+            clubs: [side, opponent],
+            scorelines: [Matchweek.Scoreline(homeID: "user", awayID: "other", homeScore: 0, awayScore: 0)],
+            tallies: [],
+            userClubID: "user",
+            seed: 3,
+            tuning: tuning
+        )
+        let club = try #require(settlement.clubs.first { $0.id == "user" })
+        let healed = try #require(club.players.first { $0.id == "hurt" })
+        #expect(healed.injury == nil)
+        #expect(healed.condition == tuning.conditionOnRecovery)
+        #expect(club.injuryLines.isEmpty)
+        let returns = ReturnNotice.arriving(before: before, after: club.players, weekIndex: 4)
+        #expect(returns.map(\.headline) == ["Bo Queef is back from a dead leg."])
+        #expect(InjuryNotice.arriving(before: before, after: club.players, weekIndex: 4).isEmpty)
+    }
+
+    @Test func higherLevelsTakeLonger() throws {
+        let tuning = WeekTuning.current
+        #expect(tuning.requiredXP(level: 0) == tuning.xpForFirstSkill)
+        #expect(tuning.requiredXP(level: 0) == 100)
+        #expect(tuning.requiredXP(level: 1) == 110)
+        #expect(tuning.requiredXP(level: 4) == 140)
+        #expect(tuning.requiredXP(level: 4) > tuning.requiredXP(level: 1))
+
+        var quiet = tuning
+        quiet.injuryChanceGreen = 0
+        quiet.injuryChanceYellow = 0
+        quiet.injuryChanceOrange = 0
+        quiet.injuryChanceRed = 0
+        let early = try levelCheck(xp: quiet.requiredXP(level: 0) - quiet.xpForStart, level: 0, tuning: quiet)
+        #expect(early.offers.count == 1)
+        #expect(early.player.level == 0)
+        #expect(early.player.xp == 0)
+
+        let waiting = try levelCheck(xp: quiet.requiredXP(level: 0) - quiet.xpForStart, level: 1, tuning: quiet)
+        #expect(waiting.offers.isEmpty)
+        #expect(waiting.player.level == 1)
+        #expect(waiting.player.xp == quiet.requiredXP(level: 0))
+        #expect(waiting.player.xp < quiet.requiredXP(level: 1))
+
+        let later = try levelCheck(xp: quiet.requiredXP(level: 1) - quiet.xpForStart, level: 2, tuning: quiet)
+        #expect(later.offers.isEmpty)
+        #expect(later.player.xp == quiet.requiredXP(level: 1))
+        #expect(later.player.xp < quiet.requiredXP(level: 2))
     }
 
     @Test func otherClubsRestOneTiredPlayerAndLeaveAGreenSideAlone() throws {
@@ -412,6 +478,7 @@ struct WeekBetweenFeatureTests {
         let updated = try #require(store.state.userClub?.players.first { $0.id == player.id })
         #expect(updated.ratings.value(for: stat) == player.ratings.value(for: stat) + points * 2)
         #expect(updated.skillsEarned == player.skillsEarned + 2)
+        #expect(updated.level == player.level + 2)
     }
 
     @Test func theLastWeekSpendsSkillsBeforeTheChampionship() async throws {
@@ -512,6 +579,81 @@ struct WeekBetweenFeatureTests {
         await store.finish()
         #expect(store.state.skillChoice == nil)
         #expect(store.state.weekIndex == 1)
+        #expect(store.state.returnNotice == nil)
+    }
+
+    @Test func returnsAreReadAfterTheWeekAdvances() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let player = try #require(state.userClub?.starters.first)
+        state.committedWeeks = 1
+        state.injuryNotices = [
+            notice("fresh", name: "Ada Keeper", ailment: "sprained ankle", cause: "Arsenal's Bo Queef elbowed him.")
+        ]
+        state.returnNotices = [
+            ReturnNotice(id: "one", playerName: "Cy Defender", positionTitle: "Defender", ailment: "dead leg", weekIndex: 0),
+            ReturnNotice(id: "two", playerName: "Bea Forward", positionTitle: "Forward", ailment: "twisted knee", weekIndex: 0),
+        ]
+        state.skillOffers = [SkillOffer(id: "offer", playerID: player.id, clubID: "manchester-city")]
+        let store = TestStore(initialState: state) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.nextFixtureButtonTapped))
+        #expect(store.state.weekIndex == 0)
+        #expect(store.state.injuryNotice?.notice.playerName == "Ada Keeper")
+        #expect(store.state.returnNotice == nil)
+
+        await store.send(.injuryNotice(.presented(.view(.continueTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.weekIndex == 0)
+        #expect(store.state.skillChoice?.contextLine == "Before the next week")
+        #expect(store.state.returnNotice == nil)
+
+        await store.send(.skillChoice(.presented(.view(.statTapped(.passing)))))
+        await store.skipReceivedActions()
+        let first = try #require(store.state.returnNotice)
+        #expect(store.state.weekIndex == 1)
+        #expect(store.state.injuryNotice == nil)
+        #expect(store.state.skillChoice == nil)
+        #expect(first.step == 1)
+        #expect(first.stepCount == 2)
+        #expect(first.notice.headline == "Cy Defender is back from a dead leg.")
+
+        await store.send(.returnNotice(.presented(.view(.continueTapped))))
+        await store.skipReceivedActions()
+        let second = try #require(store.state.returnNotice)
+        #expect(store.state.weekIndex == 1)
+        #expect(second.step == 2)
+        #expect(second.notice.playerName == "Bea Forward")
+
+        await store.send(.returnNotice(.presented(.view(.continueTapped))))
+        await store.skipReceivedActions()
+        await store.finish()
+        #expect(store.state.returnNotice == nil)
+        #expect(store.state.returnNotices.isEmpty)
+        #expect(store.state.weekIndex == 1)
+    }
+
+    @Test func aSavedReturnOpensOnTheNewWeek() throws {
+        let season = LeagueDraft.makeLeague(seed: 3)
+        var career = Career(matchweek: MatchweekFeature.State(userClubID: "everton", season: season))
+        career.weekIndex = 3
+        career.committedWeeks = 4
+        career.returnNotices = [
+            ReturnNotice(id: "back", playerName: "Ada Keeper", positionTitle: "Keeper", ailment: "sprained ankle", weekIndex: 3)
+        ]
+        let waiting = MatchweekFeature.State(career: career)
+        #expect(waiting.weekIndex == 3)
+        #expect(waiting.returnNotice == nil)
+
+        career.weekIndex = 4
+        let week = MatchweekFeature.State(career: career)
+        #expect(week.weekIndex == 4)
+        #expect(week.returnNotice?.notice.headline == "Ada Keeper is back from a sprained ankle.")
+        #expect(week.returnNotice?.step == 1)
+        #expect(week.returnNotices.count == 1)
     }
 
     @Test func theLastWeekReadsInjuriesBeforeTheChampionship() async throws {
@@ -539,6 +681,17 @@ struct WeekBetweenFeatureTests {
         #expect(store.state.injuryNotice == nil)
         #expect(store.state.championship?.record.championClubID == "manchester-city")
     }
+
+    @Test func experienceShowsOnTheUsersPlayerOnly() throws {
+        let season = LeagueDraft.makeLeague(seed: 1)
+        let state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let user = try #require(state.userClub)
+        let other = try #require(state.clubs.first { $0.id != user.id })
+        let own = try #require(user.starters.first)
+        let rival = try #require(other.starters.first)
+        #expect(state.playerDetail(for: own, in: user).showsExperience)
+        #expect(state.playerDetail(for: rival, in: other).showsExperience == false)
+    }
 }
 
 private func busiest(_ weeks: [Int]) -> Int {
@@ -558,6 +711,29 @@ private func notice(_ id: String, name: String, ailment: String, cause: String) 
         cause: cause,
         weeksLeft: 2
     )
+}
+
+private func levelCheck(
+    xp: Int,
+    level: Int,
+    tuning: WeekTuning
+) throws -> (offers: [SkillOffer], player: Player) {
+    var player = squadPlayer(id: "user-forward", position: .forward, starter: true, xp: xp)
+    player.level = level
+    player.skillsEarned = level
+    let keeper = squadPlayer(id: "user-keeper", position: .keeper, starter: true)
+    let side = sampleClub(id: "user", players: [keeper, player])
+    let opponent = sampleClub(id: "other", players: [squadPlayer(id: "away-keeper", position: .keeper, starter: true)])
+    let settlement = WeekBetween.settle(
+        clubs: [side, opponent],
+        scorelines: [Matchweek.Scoreline(homeID: "user", awayID: "other", homeScore: 0, awayScore: 0)],
+        tallies: [],
+        userClubID: "user",
+        seed: 1,
+        tuning: tuning
+    )
+    let after = try #require(settlement.clubs.first { $0.id == "user" }?.players.first { $0.id == "user-forward" })
+    return (settlement.offers, after)
 }
 
 private func settledSkills(xp: Int, tuning: WeekTuning) throws -> WeekBetween.Settlement {

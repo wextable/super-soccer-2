@@ -78,6 +78,28 @@ struct RatingTrackTests {
         #expect(tired.markedPoints == 10)
         #expect(growing.filledPoints == 80)
         #expect(growing.markedPoints == 5)
+        let early = RatingTrack.experience(current: 40, required: 100)
+        let later = RatingTrack.experience(current: 40, required: 140)
+        #expect(early.markedPoints == 0)
+        #expect(early.filledPoints + early.emptyPoints == RatingTrack.trackPoints)
+        #expect(early.filledPoints == 40)
+        #expect(later.filledPoints < early.filledPoints)
+        #expect(later.filledPoints == Int((40.0 / 140.0 * 100).rounded()))
+        let progress = ExperienceProgress.make(
+            player: Player(
+                id: "p",
+                firstName: "Ada",
+                lastName: "Ball",
+                position: .forward,
+                condition: 100,
+                ratings: Ratings(speed: 70, shooting: 70, passing: 70, dribbling: 70, defending: 70, goalkeeping: 70),
+                xp: 40,
+                level: 1
+            )
+        )
+        #expect(progress.required == 110)
+        #expect(progress.remaining == 70)
+        #expect(progress.reading == "40/110")
         #expect(GrowthReading.widest == "90→99")
         #expect(GrowthReading.widest.count == SkillProjection.make(current: 80, boost: 5).reading.count)
     }

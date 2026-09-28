@@ -15,7 +15,8 @@ extension Career {
             record: state.record,
             skillOffers: state.skillOffers,
             skillChoices: state.skillChoices,
-            injuryNotices: state.injuryNotices
+            injuryNotices: state.injuryNotices,
+            returnNotices: state.returnNotices,
             playedWeeks: state.playedWeeks
         )
     }
@@ -36,6 +37,8 @@ extension Career {
         case skillOffers
         case skillChoices
         case injuryNotices
+        case returnNotices
+        case playedWeeks
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +56,8 @@ extension Career {
         skillOffers = try container.decode([SkillOffer].self, forKey: .skillOffers)
         skillChoices = try container.decode([SkillChoice].self, forKey: .skillChoices)
         injuryNotices = try container.decodeIfPresent([InjuryNotice].self, forKey: .injuryNotices) ?? []
+        returnNotices = try container.decodeIfPresent([ReturnNotice].self, forKey: .returnNotices) ?? []
+        playedWeeks = try container.decodeIfPresent([[Matchweek.Scoreline]].self, forKey: .playedWeeks)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -70,6 +75,8 @@ extension Career {
         try container.encode(skillOffers, forKey: .skillOffers)
         try container.encode(skillChoices, forKey: .skillChoices)
         try container.encode(injuryNotices, forKey: .injuryNotices)
+        try container.encode(returnNotices, forKey: .returnNotices)
+        try container.encodeIfPresent(playedWeeks, forKey: .playedWeeks)
     }
 }
 
@@ -92,11 +99,13 @@ extension MatchweekFeature.State {
         skillOffers = career.skillOffers
         skillChoices = career.skillChoices
         injuryNotices = career.injuryNotices
+        returnNotices = career.returnNotices
         lineupRevision = 0
         skillsChosen = 0
         skillFollowUp = nil
         skillChoice = nil
         injuryNotice = nil
+        returnNotice = nil
         highlight = nil
         stats = nil
         leaders = nil
@@ -105,5 +114,10 @@ extension MatchweekFeature.State {
         player = nil
         substitution = nil
         seasonAlert = nil
+        if seasonIsOver {
+            returnNotices = []
+        } else if let queuedWeek = returnNotices.map(\.weekIndex).max(), weekIndex > queuedWeek {
+            presentNextReturn()
+        }
     }
 }

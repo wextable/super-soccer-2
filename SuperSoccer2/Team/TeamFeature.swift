@@ -44,7 +44,12 @@ struct TeamFeature {
             switch action {
             case let .view(.playerTapped(id)):
                 guard let player = state.club.players.first(where: { $0.id == id }) else { return .none }
-                state.player = PlayerDetailFeature.State(player: player, clubName: state.club.name, clubID: state.club.id)
+                state.player = PlayerDetailFeature.State(
+                    player: player,
+                    clubName: state.club.name,
+                    clubID: state.club.id,
+                    showsExperience: state.canManage
+                )
                 return .none
 
             case let .view(.restStarter(id)):

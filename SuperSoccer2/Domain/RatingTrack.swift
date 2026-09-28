@@ -21,6 +21,18 @@ struct RatingTrack: Equatable, Sendable {
         )
     }
 
+    /// How much of the bar the current level has filled. The empty stretch is what is left before the next level.
+    static func experience(current: Int, required: Int) -> RatingTrack {
+        let required = max(required, 1)
+        let current = min(max(0, current), required)
+        let filled = min(trackPoints, Int((Double(current) / Double(required) * Double(trackPoints)).rounded()))
+        return RatingTrack(
+            filledPoints: filled,
+            markedPoints: 0,
+            emptyPoints: trackPoints - filled
+        )
+    }
+
     /// The rating today, then only the points this skill can still add. Nothing past 99 is drawn.
     static func growth(_ projection: SkillProjection) -> RatingTrack {
         RatingTrack(
@@ -28,6 +40,28 @@ struct RatingTrack: Equatable, Sendable {
             markedPoints: projection.next - projection.current,
             emptyPoints: trackPoints - projection.next
         )
+    }
+}
+
+/// Experience already banked toward the next level, and how much that level still costs.
+struct ExperienceProgress: Equatable, Sendable {
+    var level: Int
+    var current: Int
+    var required: Int
+
+    var remaining: Int { max(0, required - current) }
+
+    var track: RatingTrack {
+        RatingTrack.experience(current: current, required: required)
+    }
+
+    /// `40/110`. The bar and this reading are the same distance.
+    var reading: String { "\(current)/\(required)" }
+
+    static func make(player: Player, tuning: WeekTuning = .current) -> ExperienceProgress {
+        let required = max(tuning.requiredXP(level: player.level), 1)
+        let current = min(max(0, player.xp), required)
+        return ExperienceProgress(level: player.level, current: current, required: required)
     }
 }
 

@@ -57,7 +57,12 @@ struct LeadersFeature {
                     ?? state.assists.first { $0.player.id == id }
                     ?? state.saves.first { $0.player.id == id }
                 guard let row else { return .none }
-                state.player = PlayerDetailFeature.State(player: row.player, clubName: row.clubName, clubID: row.clubID)
+                state.player = PlayerDetailFeature.State(
+                    player: row.player,
+                    clubName: row.clubName,
+                    clubID: row.clubID,
+                    showsExperience: row.clubID == state.userClubID
+                )
                 return .none
             case .view(.expandGoalsTapped):
                 state.goalsExpanded = true

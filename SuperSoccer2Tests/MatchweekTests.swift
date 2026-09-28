@@ -447,6 +447,7 @@ struct MatchweekFeatureTests {
         let standings = store.state.standings
 
         await store.send(.view(.nextFixtureButtonTapped))
+        await finishPresentedWeekSteps(store)
         await store.finish()
         #expect(store.state.weekIndex == 1)
         #expect(store.state.browsedWeekIndex == nil)
@@ -547,7 +548,12 @@ struct MatchweekFeatureTests {
         let leader = try #require(goals.first)
         await store.send(.view(.leadersButtonTapped))
         await store.send(.leaders(.presented(.view(.playerTapped(leader.player.id)))))
-        #expect(store.state.leaders?.player == PlayerDetailFeature.State(player: leader.player, clubName: leader.clubName, clubID: leader.clubID))
+        #expect(store.state.leaders?.player == PlayerDetailFeature.State(
+            player: leader.player,
+            clubName: leader.clubName,
+            clubID: leader.clubID,
+            showsExperience: leader.clubID == "manchester-city"
+        ))
 
         let frozen = (goals, assists, saves)
         await store.send(.view(.replayButtonTapped))
@@ -625,7 +631,12 @@ struct MatchweekFeatureTests {
         #expect(store.state.championship?.record == record)
         #expect(store.state.championship?.goals.map(\.player.id) == store.state.goalLeaders.filter { $0.clubID == championID }.map(\.player.id))
         await store.send(.championship(.presented(.view(.awardTapped(.goldenBoot)))))
-        #expect(store.state.championship?.player == PlayerDetailFeature.State(player: boot.player, clubName: boot.clubName, clubID: boot.clubID))
+        #expect(store.state.championship?.player == PlayerDetailFeature.State(
+            player: boot.player,
+            clubName: boot.clubName,
+            clubID: boot.clubID,
+            showsExperience: boot.clubID == "manchester-city"
+        ))
         #expect(store.state.championship?.userClubID == "manchester-city")
 
         await store.send(.view(.replayButtonTapped))
@@ -788,7 +799,12 @@ struct MatchweekFeatureTests {
         }
         let cityPlayer = try #require(city.starters.first)
         await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
-            $0.team?.player = PlayerDetailFeature.State(player: cityPlayer, clubName: city.name, clubID: city.id)
+            $0.team?.player = PlayerDetailFeature.State(
+                player: cityPlayer,
+                clubName: city.name,
+                clubID: city.id,
+                showsExperience: true
+            )
         }
         await store.send(.team(.presented(.player(.dismiss)))) {
             $0.team?.player = nil
