@@ -36,6 +36,9 @@ struct PlayerDetailView: View {
                     .font(theme.type.tagline)
                     .foregroundStyle(theme.colors.secondaryText.color)
             }
+            Text("Age \(store.player.age)")
+                .font(theme.type.homeLine)
+                .foregroundStyle(theme.colors.secondaryText.color)
             Text("Overall \(store.player.overall)")
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)
@@ -83,11 +86,12 @@ struct PlayerDetailView: View {
     private func ratingRow(_ stat: PlayerStat, isLast: Bool) -> some View {
         let full = store.player.ratings.value(for: stat)
         let current = store.player.playingRating(stat)
+        let potential = store.player.potential.value(for: stat)
         let degraded = current != full
         return VStack(spacing: 0) {
             HStack(spacing: theme.space.sm) {
                 RatingLabel(text: stat.label)
-                RatingBar(track: .fitness(full: full, current: current), mark: .condition)
+                RatingBar(track: .fitness(full: full, current: current, potential: potential), mark: .condition)
                 FitnessNumber(current: current, full: full, showsFull: degraded)
             }
             .frame(minHeight: theme.metrics.minimumControl)

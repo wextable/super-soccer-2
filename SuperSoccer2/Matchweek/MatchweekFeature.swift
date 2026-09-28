@@ -458,8 +458,22 @@ struct MatchweekFeature {
         }
 
         /// Shows the next unspent skill. The step count stays put as offers are spent.
+        /// A player already at every ceiling still takes the level. That offer does not hold the week.
         @discardableResult
         mutating func presentNextSkill(contextLine: String) -> Bool {
+            while let offer = skillOffers.first, let found = squadPlayer(offer.playerID), found.player.canGrow == false {
+                var offers = skillOffers
+                var squads = clubs
+                guard WeekBetween.apply(
+                    PlayerStat.preferred(for: found.player.position),
+                    offerID: offer.id,
+                    offers: &offers,
+                    clubs: &squads
+                ) else { break }
+                skillOffers = offers
+                clubs = squads
+                skillsChosen += 1
+            }
             guard let offer = skillOffers.first, let found = squadPlayer(offer.playerID) else { return false }
             let stepCount = skillChoice?.stepCount ?? skillOffers.count
             let step = (skillChoice?.step ?? 0) + 1

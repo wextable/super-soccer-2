@@ -69,9 +69,11 @@ struct CareerPersistenceTests {
     @Test func aSkillPickIsSaved() async throws {
         let season = LeagueDraft.makeLeague(seed: 42)
         var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
-        let player = try #require(state.userClub?.starters.first)
         let stat = PlayerStat.shooting
         let points = WeekTuning.current.points(for: stat)
+        let player = try #require(state.userClub?.starters.first {
+            $0.ratings.value(for: stat) + points <= $0.potential.value(for: stat)
+        })
         state.committedWeeks = 1
         state.skillOffers = [SkillOffer(id: "offer-1", playerID: player.id, clubID: "manchester-city")]
         let box = CareerBox()
@@ -343,6 +345,15 @@ struct CareerPersistenceTests {
         #expect(player.xp == 4)
         #expect(player.level == 1)
         #expect(player.skillsEarned == 1)
+        #expect(player.age == WeekTuning.missingAge)
+        #expect(player.growth == .med)
+        #expect(player.potential == .open)
+        let projection = SkillProjection.make(
+            current: player.ratings.shooting,
+            boost: 5,
+            ceiling: player.potential.shooting
+        )
+        #expect(projection.next == 75)
     }
 }
 

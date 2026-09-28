@@ -55,7 +55,8 @@ struct SkillChoiceView: View {
     private func statRow(_ choice: SkillChoice, isLast: Bool) -> some View {
         let projection = SkillProjection.make(
             current: store.player.ratings.value(for: choice.stat),
-            boost: choice.points
+            boost: choice.points,
+            ceiling: store.player.potential.value(for: choice.stat)
         )
         return VStack(spacing: 0) {
             Button {

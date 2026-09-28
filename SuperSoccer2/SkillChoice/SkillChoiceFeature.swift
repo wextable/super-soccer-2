@@ -37,7 +37,8 @@ struct SkillChoiceFeature {
                 guard let choice = state.choices.first(where: { $0.stat == stat }) else { return .none }
                 let projection = SkillProjection.make(
                     current: state.player.ratings.value(for: stat),
-                    boost: choice.points
+                    boost: choice.points,
+                    ceiling: state.player.potential.value(for: stat)
                 )
                 guard projection.available else { return .none }
                 return .send(.delegate(.chose(stat)))

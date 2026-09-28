@@ -6,11 +6,12 @@ import Testing
 @Suite
 struct RatingTrackTests {
     @Test func ninetyDegradedToEightyFillsEightUnitsAndMarksTheNinth() {
-        let track = RatingTrack.fitness(full: 90, current: 80)
+        let track = RatingTrack.fitness(full: 90, current: 80, potential: 99)
         #expect(track.filledPoints / RatingTrack.pointsPerUnit == 8)
         #expect(track.markedPoints / RatingTrack.pointsPerUnit == 1)
-        #expect(track.emptyPoints / RatingTrack.pointsPerUnit == 1)
-        #expect(track.filledPoints + track.markedPoints + track.emptyPoints == RatingTrack.trackPoints)
+        #expect(track.emptyPoints == 9)
+        #expect(track.ceiling == 99)
+        #expect(track.filledPoints + track.markedPoints + track.emptyPoints == track.ceiling)
     }
 
     @Test func conditionUsesTheWeekScale() {
@@ -28,16 +29,18 @@ struct RatingTrackTests {
         #expect(player.fitnessBand() == .yellow)
         #expect(current == Int(Double(90) * scale))
         #expect(current < 90)
-        let track = RatingTrack.fitness(full: 90, current: current)
+        let track = RatingTrack.fitness(full: 90, current: current, potential: 96)
         #expect(track.filledPoints == current)
         #expect(track.markedPoints == 90 - current)
-        #expect(track.emptyPoints == RatingTrack.trackPoints - 90)
+        #expect(track.emptyPoints == 6)
+        #expect(track.ceiling == 96)
 
         player.condition = WeekTuning.current.greenMinimum
         #expect(player.playingRating(.speed) == 90)
-        let full = RatingTrack.fitness(full: 90, current: player.playingRating(.speed))
+        let full = RatingTrack.fitness(full: 90, current: player.playingRating(.speed), potential: 96)
         #expect(full.markedPoints == 0)
-        #expect(full.emptyPoints == 10)
+        #expect(full.filledPoints == 90)
+        #expect(full.ceiling == 96)
     }
 
     @Test func aSkillShowsTheTuningBoostAndStopsAt99() {
@@ -60,7 +63,9 @@ struct RatingTrackTests {
         #expect(capped.reading == "97→99")
         #expect(capped.available)
         #expect(RatingTrack.growth(capped).markedPoints == 2)
-        #expect(RatingTrack.growth(capped).emptyPoints == 1)
+        #expect(RatingTrack.growth(capped).emptyPoints == 0)
+        #expect(RatingTrack.growth(capped).ceiling == 99)
+        #expect(RatingTrack.trackPoints - RatingTrack.growth(capped).ceiling == 1)
 
         let full = SkillProjection.make(current: 99, boost: shooting)
         #expect(full.available == false)
@@ -69,11 +74,44 @@ struct RatingTrackTests {
         #expect(RatingTrack.growth(full).markedPoints == 0)
     }
 
+    @Test func theTrackEndsAtPotentialAndTheSameRatingFillsTheSameLength() {
+        let shorter = RatingTrack.fitness(full: 80, current: 80, potential: 85)
+        let longer = RatingTrack.fitness(full: 80, current: 80, potential: 96)
+        #expect(shorter.filledPoints == longer.filledPoints)
+        #expect(shorter.filledPoints == 80)
+        #expect(longer.ceiling > shorter.ceiling)
+        #expect(shorter.ceiling == 85)
+        #expect(longer.ceiling == 96)
+        #expect(shorter.filledPoints + shorter.markedPoints + shorter.emptyPoints == shorter.ceiling)
+        #expect(longer.filledPoints + longer.markedPoints + longer.emptyPoints == longer.ceiling)
+
+        let tight = SkillProjection.make(current: 80, boost: 5, ceiling: 82)
+        #expect(tight.reading == "80→82")
+        #expect(tight.available)
+        let preview = RatingTrack.growth(tight)
+        #expect(preview.markedPoints == 2)
+        #expect(preview.emptyPoints == 0)
+        #expect(preview.filledPoints + preview.markedPoints <= preview.ceiling)
+
+        let roomy = SkillProjection.make(current: 80, boost: 5, ceiling: 88)
+        let inside = RatingTrack.growth(roomy)
+        #expect(roomy.next == 85)
+        #expect(inside.markedPoints == 5)
+        #expect(inside.emptyPoints == 3)
+        #expect(inside.ceiling == 88)
+        #expect(inside.filledPoints + inside.markedPoints + inside.emptyPoints == inside.ceiling)
+
+        let done = SkillProjection.make(current: 80, boost: 5, ceiling: 80)
+        #expect(done.available == false)
+        #expect(done.reading == "80")
+        #expect(done.next == 80)
+    }
+
     @Test func growthAndConditionStayInsideOneTrack() {
-        let tired = RatingTrack.fitness(full: 90, current: 80)
+        let tired = RatingTrack.fitness(full: 90, current: 80, potential: 99)
         let growing = RatingTrack.growth(SkillProjection.make(current: 80, boost: 5))
-        #expect(tired.filledPoints + tired.markedPoints + tired.emptyPoints == RatingTrack.trackPoints)
-        #expect(growing.filledPoints + growing.markedPoints + growing.emptyPoints == RatingTrack.trackPoints)
+        #expect(tired.filledPoints + tired.markedPoints + tired.emptyPoints == tired.ceiling)
+        #expect(growing.filledPoints + growing.markedPoints + growing.emptyPoints == growing.ceiling)
         #expect(tired.filledPoints == 80)
         #expect(tired.markedPoints == 10)
         #expect(growing.filledPoints == 80)
@@ -136,6 +174,41 @@ struct SkillChoiceLimitTests {
         #expect(projection.reading == "97→99")
         await store.send(.view(.statTapped(.defending)))
         await store.receive(\.delegate.chose, .defending)
+    }
+
+    @Test func aStatAtItsCeilingCannotBeChosen() async throws {
+        var player = Player(
+            id: "p",
+            firstName: "Ada",
+            lastName: "Ball",
+            position: .forward,
+            condition: 100,
+            ratings: Ratings(speed: 80, shooting: 70, passing: 70, dribbling: 80, defending: 60, goalkeeping: 40)
+        )
+        player.potential.shooting = 70
+        let store = TestStore(
+            initialState: SkillChoiceFeature.State(
+                offerID: "offer",
+                player: player,
+                choices: WeekTuning.current.skillChoices,
+                step: 1,
+                stepCount: 1,
+                contextLine: "Before the next week"
+            )
+        ) {
+            SkillChoiceFeature()
+        }
+
+        await store.send(.view(.statTapped(.shooting)))
+        let passing = try #require(WeekTuning.current.skillChoices.first { $0.stat == .passing })
+        let projection = SkillProjection.make(
+            current: 70,
+            boost: passing.points,
+            ceiling: player.potential.passing
+        )
+        #expect(projection.reading == "70→\(70 + passing.points)")
+        await store.send(.view(.statTapped(.passing)))
+        await store.receive(\.delegate.chose, .passing)
     }
 }
 

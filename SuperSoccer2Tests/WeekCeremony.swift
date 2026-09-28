@@ -16,7 +16,7 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<MatchweekFeature>) async {
             continue
         }
         if let choice = store.state.skillChoice {
-            let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) + $0.points <= 99 }?.stat
+            let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) < choice.player.potential.value(for: $0.stat) }?.stat
                 ?? choice.choices[0].stat
             await store.send(.skillChoice(.presented(.view(.statTapped(stat)))))
             await store.skipReceivedActions()
@@ -40,7 +40,7 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<AppFeature>) async {
             continue
         }
         if let choice = store.state.game?.skillChoice {
-            let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) + $0.points <= 99 }?.stat
+            let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) < choice.player.potential.value(for: $0.stat) }?.stat
                 ?? choice.choices[0].stat
             await store.send(.game(.skillChoice(.presented(.view(.statTapped(stat))))))
             await store.skipReceivedActions()

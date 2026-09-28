@@ -80,6 +80,13 @@ struct SkillOffer: Codable, Equatable, Sendable, Identifiable {
     var clubID: String
 }
 
+/// Age, ceilings, and pace rolled for one player. The kickoff ratings are not in here.
+struct Development: Equatable, Sendable {
+    var age: Int
+    var potential: Potential
+    var growth: Growth
+}
+
 /// Weights for the week between matches. A later settings screen can bind each field.
 /// The goal-mean constants stay on `MatchTuning`.
 struct WeekTuning: Equatable, Sendable {
@@ -126,6 +133,41 @@ struct WeekTuning: Equatable, Sendable {
     var conditionOnRecovery: Int
     var injuryWeeksMin: Int
     var injuryWeeksMax: Int
+    /// Youngest age the draft rolls, in years.
+    var youngestAge: Int
+    /// First year of the prime band. Ages below this are young and keep more room.
+    var primeAge: Int
+    /// First year of the older band. These players sit close to the ceiling. Decline stays off.
+    var olderAge: Int
+    /// Oldest age the draft rolls, in years.
+    var oldestAge: Int
+    var youngAgeWeight: Int
+    var primeAgeWeight: Int
+    var olderAgeWeight: Int
+    /// Room above the current rating, inclusive. The span is the player-to-player noise.
+    var youngRoomMin: Int
+    var youngRoomMax: Int
+    var primeRoomMin: Int
+    var primeRoomMax: Int
+    var olderRoomMin: Int
+    var olderRoomMax: Int
+    /// Experience multiplier for each stored pace. Applied to the week's total, then rounded.
+    var slowGrowth: Double
+    var medGrowth: Double
+    var fastGrowth: Double
+    /// A ceiling at or above this is high. Fast growth is more common there, and it is a separate roll.
+    var highCeiling: Int
+    var modestSlowWeight: Int
+    var modestMedWeight: Int
+    var modestFastWeight: Int
+    var highSlowWeight: Int
+    var highMedWeight: Int
+    var highFastWeight: Int
+    /// Mixed into the league seed so age, potential, and growth do not move the rating generator.
+    var traitSalt: UInt64
+
+    /// Years written onto a player saved before age existed.
+    static let missingAge = 26
 
     /// A month of starts stays green. The next starts are yellow, a mild drop.
     /// Orange is the longer run after that, close to red. Red stays the high risk.
@@ -160,7 +202,31 @@ struct WeekTuning: Equatable, Sendable {
         skillPointsGoalkeeping: 3,
         conditionOnRecovery: 84,
         injuryWeeksMin: 1,
-        injuryWeeksMax: 3
+        injuryWeeksMax: 3,
+        youngestAge: 17,
+        primeAge: 22,
+        olderAge: 29,
+        oldestAge: 36,
+        youngAgeWeight: 25,
+        primeAgeWeight: 50,
+        olderAgeWeight: 25,
+        youngRoomMin: 6,
+        youngRoomMax: 30,
+        primeRoomMin: 0,
+        primeRoomMax: 16,
+        olderRoomMin: 0,
+        olderRoomMax: 5,
+        slowGrowth: 0.8,
+        medGrowth: 1.0,
+        fastGrowth: 1.3,
+        highCeiling: 90,
+        modestSlowWeight: 40,
+        modestMedWeight: 45,
+        modestFastWeight: 15,
+        highSlowWeight: 15,
+        highMedWeight: 40,
+        highFastWeight: 45,
+        traitSalt: 0xA6E1_5A7E
     )
 
     func band(for condition: Int) -> FitnessBand {
@@ -202,6 +268,86 @@ struct WeekTuning: Equatable, Sendable {
     /// Experience still to earn before the next level. Level 0 costs `xpForFirstSkill`. Each level after that costs ten more at the shipped tuning.
     func requiredXP(level: Int) -> Int {
         xpForFirstSkill + extraXpPerSkill * level
+    }
+
+    func growthRate(_ growth: Growth) -> Double {
+        switch growth {
+        case .slow: slowGrowth
+        case .med: medGrowth
+        case .fast: fastGrowth
+        }
+    }
+
+    /// The week's experience after this player's pace. The global amounts stay put. The result is an integer.
+    func earnedXP(_ raw: Int, growth: Growth) -> Int {
+        let gain = max(0, raw)
+        return Int((Double(gain) * growthRate(growth)).rounded())
+    }
+
+    /// How many points of ceiling sit above a rating at this age. Inclusive.
+    func roomRange(for age: Int) -> ClosedRange<Int> {
+        if age < primeAge {
+            return youngRoomMin...youngRoomMax
+        }
+        if age < olderAge {
+            return primeRoomMin...primeRoomMax
+        }
+        return olderRoomMin...olderRoomMax
+    }
+
+    /// Age, then a ceiling for each attribute, then a pace. The pace is not the ceiling roll.
+    func rollDevelopment(ratings: Ratings, using generator: inout SeededGenerator) -> Development {
+        let age = rollAge(using: &generator)
+        let potential = rollPotential(ratings: ratings, age: age, using: &generator)
+        let growth = rollGrowth(potential: potential, using: &generator)
+        return Development(age: age, potential: potential, growth: growth)
+    }
+
+    private func rollAge(using generator: inout SeededGenerator) -> Int {
+        let young = youngestAge...max(youngestAge, primeAge - 1)
+        let prime = primeAge...max(primeAge, olderAge - 1)
+        let older = olderAge...max(olderAge, oldestAge)
+        let band = pick(
+            [(young, youngAgeWeight), (prime, primeAgeWeight), (older, olderAgeWeight)],
+            using: &generator
+        )
+        return Int.random(in: band, using: &generator)
+    }
+
+    private func rollPotential(ratings: Ratings, age: Int, using generator: inout SeededGenerator) -> Potential {
+        let span = roomRange(for: age)
+        func ceiling(_ current: Int) -> Int {
+            let rating = min(99, max(0, current))
+            let room = Int.random(in: span, using: &generator)
+            return min(99, max(rating, rating + room))
+        }
+        return Potential(
+            speed: ceiling(ratings.speed),
+            shooting: ceiling(ratings.shooting),
+            passing: ceiling(ratings.passing),
+            dribbling: ceiling(ratings.dribbling),
+            defending: ceiling(ratings.defending),
+            goalkeeping: ceiling(ratings.goalkeeping)
+        )
+    }
+
+    private func rollGrowth(potential: Potential, using generator: inout SeededGenerator) -> Growth {
+        let high = potential.highest >= highCeiling
+        let options: [(Growth, Int)] = high
+            ? [(.slow, highSlowWeight), (.med, highMedWeight), (.fast, highFastWeight)]
+            : [(.slow, modestSlowWeight), (.med, modestMedWeight), (.fast, modestFastWeight)]
+        return pick(options, using: &generator)
+    }
+
+    private func pick<T>(_ options: [(T, Int)], using generator: inout SeededGenerator) -> T {
+        let weights = options.map { max(0, $0.1) }
+        let total = max(weights.reduce(0, +), 1)
+        var draw = Int.random(in: 0..<total, using: &generator)
+        for (option, weight) in zip(options.map(\.0), weights) where weight > 0 {
+            if draw < weight { return option }
+            draw -= weight
+        }
+        return options[0].0
     }
 
     /// Experience already on the clock when the player is drafted. Below the first skill, and different for each id.
