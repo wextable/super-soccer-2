@@ -127,7 +127,8 @@ struct GrowthReading: View {
     static let widest = SkillProjection.make(current: 90, boost: 9).reading
 }
 
-/// A rating drawn left to right on one shared track. Growth and lost fitness sit inside that track. The fill is the rating.
+/// A rating drawn left to right on the 1–99 scale. The track ends at the ceiling. The fill ends at the rating.
+/// Growth and lost fitness sit inside the track. The same rating is the same fill, whatever the ceiling.
 struct RatingBar: View {
     @Environment(\.theme) private var theme
     var track: RatingTrack
@@ -139,19 +140,22 @@ struct RatingBar: View {
     }
 
     var body: some View {
-        Capsule()
-            .fill(theme.colors.hairline.color)
+        Color.clear
             .frame(maxWidth: .infinity, minHeight: theme.space.sm, maxHeight: theme.space.sm)
             .overlay {
                 GeometryReader { proxy in
                     let width = proxy.size.width
                     let scale = width / CGFloat(RatingTrack.trackPoints)
+                    let trackWidth = min(width, scale * CGFloat(max(track.ceiling, 0)))
                     ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(theme.colors.hairline.color)
+                            .frame(width: trackWidth, height: proxy.size.height)
                         if track.markedPoints > 0 {
                             Capsule()
                                 .fill(markColor)
                                 .frame(
-                                    width: min(width, scale * CGFloat(track.filledPoints + track.markedPoints)),
+                                    width: min(trackWidth, scale * CGFloat(track.filledPoints + track.markedPoints)),
                                     height: proxy.size.height
                                 )
                         }
@@ -159,7 +163,7 @@ struct RatingBar: View {
                             Capsule()
                                 .fill(theme.colors.action.color)
                                 .frame(
-                                    width: min(width, scale * CGFloat(track.filledPoints)),
+                                    width: min(trackWidth, scale * CGFloat(track.filledPoints)),
                                     height: proxy.size.height
                                 )
                         }
@@ -167,7 +171,6 @@ struct RatingBar: View {
                     .frame(width: width, height: proxy.size.height, alignment: .leading)
                 }
             }
-            .clipShape(Capsule())
             .accessibilityHidden(true)
     }
 

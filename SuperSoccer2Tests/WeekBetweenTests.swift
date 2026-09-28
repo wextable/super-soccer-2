@@ -440,7 +440,9 @@ struct WeekBetweenFeatureTests {
         var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
         let stat = PlayerStat.defending
         let points = WeekTuning.current.points(for: stat)
-        let player = try #require(state.userClub?.starters.first { $0.ratings.value(for: stat) + points * 2 <= 99 })
+        let player = try #require(state.userClub?.starters.first {
+            $0.ratings.value(for: stat) + points * 2 <= $0.potential.value(for: stat)
+        })
         state.committedWeeks = 1
         state.skillOffers = [
             SkillOffer(id: "one", playerID: player.id, clubID: "manchester-city"),
@@ -484,7 +486,10 @@ struct WeekBetweenFeatureTests {
     @Test func theLastWeekSpendsSkillsBeforeTheChampionship() async throws {
         let season = LeagueDraft.makeLeague(seed: 42)
         var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
-        let player = try #require(state.userClub?.starters.first)
+        let points = WeekTuning.current.skillPointsPassing
+        let player = try #require(state.userClub?.starters.first {
+            $0.ratings.passing + points <= $0.potential.passing
+        })
         state.weekIndex = state.weeks.count - 1
         state.committedWeeks = state.weeks.count
         state.record = SeasonRecord(championClubID: "manchester-city", championName: "Manchester City", awards: [])
@@ -692,6 +697,81 @@ struct WeekBetweenFeatureTests {
         #expect(state.playerDetail(for: own, in: user).showsExperience)
         #expect(state.playerDetail(for: rival, in: other).showsExperience == false)
     }
+
+    @Test func growthMultipliesTheWeeksExperienceAndLeavesTheCost() throws {
+        let tuning = WeekTuning.current
+        #expect(tuning.xpForStart == 10)
+        #expect(tuning.xpForGoal == 5)
+        #expect(tuning.xpForFirstSkill == 100)
+        #expect(tuning.extraXpPerSkill == 10)
+        #expect(tuning.requiredXP(level: 0) == 100)
+        #expect(tuning.requiredXP(level: 1) == 110)
+        #expect(tuning.slowGrowth == 0.8)
+        #expect(tuning.medGrowth == 1.0)
+        #expect(tuning.fastGrowth == 1.3)
+        #expect(tuning.earnedXP(10, growth: .slow) == 8)
+        #expect(tuning.earnedXP(10, growth: .med) == 10)
+        #expect(tuning.earnedXP(10, growth: .fast) == 13)
+        #expect(tuning.earnedXP(12, growth: .slow) == 10)
+        #expect(tuning.earnedXP(5, growth: .fast) == 7)
+
+        #expect(try gained(.slow) == 8)
+        #expect(try gained(.med) == 10)
+        #expect(try gained(.fast) == 13)
+    }
+
+    @Test func aSkillStopsAtTheAttributeCeiling() throws {
+        var player = squadPlayer(id: "user-forward", position: .forward, starter: true)
+        player.ratings.shooting = 80
+        player.potential.shooting = 82
+        var offers = [SkillOffer(id: "offer", playerID: player.id, clubID: "user")]
+        var clubs = [sampleClub(id: "user", players: [player])]
+        #expect(WeekBetween.apply(.shooting, offerID: "offer", offers: &offers, clubs: &clubs))
+        let updated = try #require(clubs[0].players.first { $0.id == player.id })
+        #expect(updated.ratings.shooting == 82)
+        #expect(updated.ratings.speed == player.ratings.speed)
+        #expect(updated.level == player.level + 1)
+        #expect(offers.isEmpty)
+    }
+
+    @Test func aPlayerAtEveryCeilingDoesNotHoldTheWeek() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let starter = try #require(state.userClub?.starters.first)
+        state.clubs = state.clubs.map { club in
+            guard club.id == "manchester-city" else { return club }
+            var club = club
+            club.players = club.players.map { player in
+                guard player.id == starter.id else { return player }
+                var player = player
+                player.potential = Potential(
+                    speed: player.ratings.speed,
+                    shooting: player.ratings.shooting,
+                    passing: player.ratings.passing,
+                    dribbling: player.ratings.dribbling,
+                    defending: player.ratings.defending,
+                    goalkeeping: player.ratings.goalkeeping
+                )
+                return player
+            }
+            return club
+        }
+        state.committedWeeks = 1
+        state.skillOffers = [SkillOffer(id: "offer", playerID: starter.id, clubID: "manchester-city")]
+        let store = TestStore(initialState: state) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.nextFixtureButtonTapped))
+        await store.finish()
+        #expect(store.state.skillChoice == nil)
+        #expect(store.state.skillOffers.isEmpty)
+        #expect(store.state.weekIndex == 1)
+        let updated = try #require(store.state.userClub?.players.first { $0.id == starter.id })
+        #expect(updated.ratings == starter.ratings)
+        #expect(updated.level == starter.level + 1)
+    }
 }
 
 private func busiest(_ weeks: [Int]) -> Int {
@@ -711,6 +791,23 @@ private func notice(_ id: String, name: String, ailment: String, cause: String) 
         cause: cause,
         weeksLeft: 2
     )
+}
+
+private func gained(_ growth: Growth) throws -> Int {
+    var player = squadPlayer(id: "user-forward", position: .forward, starter: true)
+    player.growth = growth
+    let keeper = squadPlayer(id: "user-keeper", position: .keeper, starter: true)
+    let side = sampleClub(id: "user", players: [keeper, player])
+    let opponent = sampleClub(id: "other", players: [squadPlayer(id: "away-keeper", position: .keeper, starter: true)])
+    let settlement = WeekBetween.settle(
+        clubs: [side, opponent],
+        scorelines: [Matchweek.Scoreline(homeID: "user", awayID: "other", homeScore: 1, awayScore: 1)],
+        tallies: [],
+        userClubID: "user",
+        seed: 1
+    )
+    let after = try #require(settlement.clubs.first { $0.id == "user" }?.players.first { $0.id == "user-forward" })
+    return after.xp
 }
 
 private func levelCheck(

@@ -32,6 +32,7 @@ enum LeagueDraft {
     static func makeLeague(seed: UInt64) -> Season {
         var generator = SeededGenerator(seed: seed)
         var pool = makePool(using: &generator)
+        pool = assignDevelopment(pool, seed: seed)
         pool.sort { $0.overall > $1.overall }
 
         var rosters = Array(repeating: [Player](), count: templates.count)
@@ -80,6 +81,20 @@ enum LeagueDraft {
             share = 1
         }
         return Int(Double(clubs) * share)
+    }
+
+    /// Age, potential, and growth use their own generator. The rating draws, and the fixture shuffle after them, stay put.
+    private static func assignDevelopment(_ pool: [Player], seed: UInt64) -> [Player] {
+        let tuning = WeekTuning.current
+        var traits = SeededGenerator(seed: seed &+ tuning.traitSalt)
+        return pool.map { player in
+            var player = player
+            let development = tuning.rollDevelopment(ratings: player.ratings, using: &traits)
+            player.age = development.age
+            player.potential = development.potential
+            player.growth = development.growth
+            return player
+        }
     }
 
     private static func makePool(using generator: inout SeededGenerator) -> [Player] {
@@ -181,7 +196,8 @@ enum LeagueDraft {
         return player
     }
 
-    /// Position, then the old half-star bands, higher first. Potential is not rolled, so a star tie keeps draft order.
+    /// Position, then the old half-star bands, higher first. A star tie keeps draft order.
+    /// Potential is rolled, and it does not break that tie. Older players do not lose ratings.
     private static func sortRoster(_ roster: [Player]) -> [Player] {
         roster.sorted { lhs, rhs in
             let left = lhs.position.ordinal

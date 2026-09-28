@@ -102,6 +102,60 @@ struct Ratings: Codable, Equatable, Sendable {
         case .goalkeeping: goalkeeping
         }
     }
+
+    mutating func set(_ stat: PlayerStat, to value: Int) {
+        switch stat {
+        case .speed: speed = value
+        case .shooting: shooting = value
+        case .passing: passing = value
+        case .dribbling: dribbling = value
+        case .defending: defending = value
+        case .goalkeeping: goalkeeping = value
+        }
+    }
+}
+
+/// How quickly a week's experience reaches the next level.
+/// The player screen does not name these. The experience bar is the pace.
+enum Growth: String, Codable, Equatable, Sendable {
+    case slow
+    case med
+    case fast
+}
+
+/// One ceiling for each attribute, from 1 to 99. The current rating never passes it.
+struct Potential: Codable, Equatable, Sendable {
+    var speed: Int
+    var shooting: Int
+    var passing: Int
+    var dribbling: Int
+    var defending: Int
+    var goalkeeping: Int
+
+    func value(for stat: PlayerStat) -> Int {
+        switch stat {
+        case .speed: speed
+        case .shooting: shooting
+        case .passing: passing
+        case .dribbling: dribbling
+        case .defending: defending
+        case .goalkeeping: goalkeeping
+        }
+    }
+
+    var highest: Int {
+        max(speed, max(shooting, max(passing, max(dribbling, max(defending, goalkeeping)))))
+    }
+
+    /// A career saved before ceilings. Every stat could still reach the old cap.
+    static let open = Potential(
+        speed: 99,
+        shooting: 99,
+        passing: 99,
+        dribbling: 99,
+        defending: 99,
+        goalkeeping: 99
+    )
 }
 
 struct Player: Codable, Equatable, Sendable, Identifiable {
@@ -120,6 +174,12 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     /// Set during the tier draft. The match reads starters only.
     var isStarter: Bool = false
     var ratings: Ratings
+    /// Years. Shown on the player screen. It does not pull ratings down.
+    var age: Int = WeekTuning.missingAge
+    /// The ceiling for each attribute. The rating stops here instead of at a flat 99.
+    var potential: Potential = .open
+    /// Stored pace for the experience earned this week. Not a label on the player screen.
+    var growth: Growth = .med
     var xp: Int = 0
     /// Levels already earned. The next level costs more than this one.
     var level: Int = 0
@@ -171,6 +231,11 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
         let scale = WeekTuning.current.ratingScale(for: fitnessBand())
         return Int(Double(rating) * scale)
     }
+
+    /// True when at least one attribute is still under its ceiling.
+    var canGrow: Bool {
+        PlayerStat.allCases.contains { ratings.value(for: $0) < potential.value(for: $0) }
+    }
 }
 
 extension Player.Injury {
@@ -204,6 +269,9 @@ extension Player {
         case condition
         case isStarter
         case ratings
+        case age
+        case potential
+        case growth
         case xp
         case level
         case skillsEarned
@@ -220,6 +288,9 @@ extension Player {
         condition = try container.decode(Int.self, forKey: .condition)
         isStarter = try container.decodeIfPresent(Bool.self, forKey: .isStarter) ?? false
         ratings = try container.decode(Ratings.self, forKey: .ratings)
+        age = try container.decodeIfPresent(Int.self, forKey: .age) ?? WeekTuning.missingAge
+        potential = try container.decodeIfPresent(Potential.self, forKey: .potential) ?? .open
+        growth = try container.decodeIfPresent(Growth.self, forKey: .growth) ?? .med
         xp = try container.decodeIfPresent(Int.self, forKey: .xp) ?? 0
         skillsEarned = try container.decodeIfPresent(Int.self, forKey: .skillsEarned) ?? 0
         level = try container.decodeIfPresent(Int.self, forKey: .level) ?? skillsEarned
@@ -236,6 +307,9 @@ extension Player {
         try container.encode(condition, forKey: .condition)
         try container.encode(isStarter, forKey: .isStarter)
         try container.encode(ratings, forKey: .ratings)
+        try container.encode(age, forKey: .age)
+        try container.encode(potential, forKey: .potential)
+        try container.encode(growth, forKey: .growth)
         try container.encode(xp, forKey: .xp)
         try container.encode(level, forKey: .level)
         try container.encode(skillsEarned, forKey: .skillsEarned)

@@ -243,12 +243,13 @@ enum WeekBetween {
         for starter in played {
             guard let playerIndex = clubs[clubIndex].players.firstIndex(where: { $0.id == starter.id }) else { continue }
             var player = clubs[clubIndex].players[playerIndex]
-            player.xp += experience(
+            let raw = experience(
                 for: starter,
                 conceded: conceded,
                 tallies: tallies,
                 tuning: tuning
             )
+            player.xp += tuning.earnedXP(raw, growth: player.growth)
             if isUser {
                 var pending = 0
                 while player.xp >= tuning.requiredXP(level: player.level + pending) {
@@ -416,20 +417,11 @@ enum WeekBetween {
     }
 
     private static func add(_ stat: PlayerStat, to player: inout Player, tuning: WeekTuning) {
-        let points = tuning.points(for: stat)
-        switch stat {
-        case .speed:
-            player.ratings.speed = min(99, player.ratings.speed + points)
-        case .shooting:
-            player.ratings.shooting = min(99, player.ratings.shooting + points)
-        case .passing:
-            player.ratings.passing = min(99, player.ratings.passing + points)
-        case .dribbling:
-            player.ratings.dribbling = min(99, player.ratings.dribbling + points)
-        case .defending:
-            player.ratings.defending = min(99, player.ratings.defending + points)
-        case .goalkeeping:
-            player.ratings.goalkeeping = min(99, player.ratings.goalkeeping + points)
+        let current = player.ratings.value(for: stat)
+        let room = max(0, player.potential.value(for: stat) - current)
+        let gain = min(tuning.points(for: stat), room)
+        if gain > 0 {
+            player.ratings.set(stat, to: current + gain)
         }
         player.skillsEarned += 1
         player.level += 1
