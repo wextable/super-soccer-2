@@ -664,6 +664,8 @@ struct WeekBetweenFeatureTests {
         #expect(week.returnNotice?.notice.headline == "Ada Keeper is back from a sprained ankle.")
         #expect(week.returnNotice?.step == 1)
         #expect(week.returnNotices.count == 1)
+        #expect(week.skillChoice == nil)
+        #expect(week.injuryNotice == nil)
     }
 
     @Test func theLastWeekReadsInjuriesBeforeTheChampionship() async throws {

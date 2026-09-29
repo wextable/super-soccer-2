@@ -122,6 +122,58 @@ struct MatchweekFeature {
             seasonAlert = nil
         }
 
+        init(career: Career) {
+            let seasonIsOver = career.committedWeeks > career.weekIndex
+                && career.weekIndex + 1 >= career.weeks.count
+            let returnNotices = seasonIsOver ? [] : career.returnNotices
+            let queuedWeek = career.returnNotices.map(\.weekIndex).max()
+            let returnNotice: ReturnNoticeFeature.State? = {
+                guard seasonIsOver == false,
+                      let queuedWeek,
+                      career.weekIndex > queuedWeek,
+                      let notice = career.returnNotices.first
+                else { return nil }
+                return ReturnNoticeFeature.State(
+                    notice: notice,
+                    step: 1,
+                    stepCount: career.returnNotices.count
+                )
+            }()
+
+            userClubID = career.userClubID
+            clubs = career.clubs
+            weeks = career.weeks
+            weekIndex = career.weekIndex
+            browsedWeekIndex = nil
+            playedWeeks = career.playedWeeks
+            standings = career.standings
+            committedWeeks = career.committedWeeks
+            pending = career.pending
+            totals = career.totals
+            playerClub = career.playerClub
+            record = career.record
+            didFail = false
+            tab = .club
+            skillOffers = career.skillOffers
+            skillChoices = career.skillChoices
+            injuryNotices = career.injuryNotices
+            self.returnNotices = returnNotices
+            lineupRevision = 0
+            skillsChosen = 0
+            skillFollowUp = nil
+            skillChoice = nil
+            injuryNotice = nil
+            self.returnNotice = returnNotice
+            highlight = nil
+            stats = nil
+            leaders = nil
+            championship = nil
+            team = nil
+            player = nil
+            substitution = nil
+            seasonAlert = nil
+        }
+
         var weekNumber: Int { weekIndex + 1 }
 
         var nextWeekNumber: Int { weekNumber + 1 }

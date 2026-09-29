@@ -34,34 +34,6 @@ struct Standing: Codable, Equatable, Sendable, Identifiable {
         self.goalsFor = goalsFor
         self.goalsAgainst = goalsAgainst
     }
-
-    private enum CodingKeys: String, CodingKey {
-        case clubID, played, won, drawn, lost, points, goalsFor, goalsAgainst
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        clubID = try container.decode(String.self, forKey: .clubID)
-        played = try container.decode(Int.self, forKey: .played)
-        won = try container.decodeIfPresent(Int.self, forKey: .won) ?? 0
-        drawn = try container.decodeIfPresent(Int.self, forKey: .drawn) ?? 0
-        lost = try container.decodeIfPresent(Int.self, forKey: .lost) ?? 0
-        points = try container.decode(Int.self, forKey: .points)
-        goalsFor = try container.decode(Int.self, forKey: .goalsFor)
-        goalsAgainst = try container.decode(Int.self, forKey: .goalsAgainst)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(clubID, forKey: .clubID)
-        try container.encode(played, forKey: .played)
-        try container.encode(won, forKey: .won)
-        try container.encode(drawn, forKey: .drawn)
-        try container.encode(lost, forKey: .lost)
-        try container.encode(points, forKey: .points)
-        try container.encode(goalsFor, forKey: .goalsFor)
-        try container.encode(goalsAgainst, forKey: .goalsAgainst)
-    }
 }
 
 enum LeagueTable {

@@ -140,20 +140,26 @@ struct LeagueTableTests {
         #expect(tiedCity < tiedNorwich)
     }
 
-    @Test func anOlderTableWithoutARecordStillLoads() throws {
+    @Test func aTableRowWithoutTheRecordDoesNotLoad() throws {
         let json = """
         {"clubID":"home","played":4,"points":7,"goalsFor":5,"goalsAgainst":3}
         """.data(using: .utf8)!
-        let row = try JSONDecoder().decode(Standing.self, from: json)
-        #expect(row.played == 4)
-        #expect(row.points == 7)
-        #expect(row.won == 0)
-        #expect(row.drawn == 0)
-        #expect(row.lost == 0)
-        #expect(row.recordLine == "0/0/0")
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Standing.self, from: json)
+        }
+        let row = Standing(
+            clubID: "home",
+            played: 4,
+            won: 2,
+            drawn: 1,
+            lost: 1,
+            points: 7,
+            goalsFor: 5,
+            goalsAgainst: 3
+        )
         let again = try JSONDecoder().decode(Standing.self, from: JSONEncoder().encode(row))
         #expect(again == row)
-        #expect(again.won == 0)
+        #expect(again.recordLine == "2/1/1")
     }
 }
 
