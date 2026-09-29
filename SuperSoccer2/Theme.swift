@@ -1,14 +1,22 @@
 import SwiftUI
 import UIKit
 
-/// One look. Light and dark both live here. Screens read the environment and do not choose colors.
+/// Looks the screens can wear. `AppView` installs one. Screens read the environment and do not choose colors.
 struct Theme: Equatable, Sendable {
     var colors: Colors
     var type: TypeScale
     var space: Space
     var metrics: Metrics
 
-    /// The only shipped look. Replace the value installed in `AppView` to swap a future theme.
+    /// Light and dark, the look this theme replaced at launch.
+    static let `default` = Theme(
+        colors: .default,
+        type: .default,
+        space: .default,
+        metrics: .default
+    )
+
+    /// Black and dark green grounds, hard edges, cyan titles, chunky pixel type.
     static let starbyte = Theme(
         colors: .starbyte,
         type: .starbyte,
@@ -39,8 +47,15 @@ extension Theme {
         /// Commentary stays the bright cyan on a near-black strip in both appearances.
         var ticker: AppearanceColor
         var tickerBackground: AppearanceColor
+        /// Screen titles. On the light look this matches `text`, so those titles stay put.
+        var title: AppearanceColor
+        /// Position ink, in this order: keeper pink, defender green, midfielder blue, forward red.
+        var keeper: AppearanceColor
+        var defender: AppearanceColor
+        var midfielder: AppearanceColor
+        var forward: AppearanceColor
 
-        static let starbyte = Colors(
+        static let `default` = Colors(
             background: AppearanceColor(light: .byte(231, 239, 232), dark: .byte(14, 21, 17)),
             text: AppearanceColor(light: .byte(20, 32, 24), dark: .byte(231, 242, 234)),
             secondaryText: AppearanceColor(light: .byte(78, 92, 84), dark: .byte(168, 184, 174)),
@@ -58,11 +73,59 @@ extension Theme {
             fitnessOrange: AppearanceColor(light: .byte(174, 68, 8), dark: .byte(255, 146, 48)),
             fitnessRed: AppearanceColor(light: .byte(168, 36, 42), dark: .byte(255, 120, 110)),
             ticker: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
-            tickerBackground: AppearanceColor(light: .byte(7, 17, 12), dark: .byte(7, 17, 12))
+            tickerBackground: AppearanceColor(light: .byte(7, 17, 12), dark: .byte(7, 17, 12)),
+            title: AppearanceColor(light: .byte(20, 32, 24), dark: .byte(231, 242, 234)),
+            keeper: AppearanceColor(light: .byte(176, 24, 120), dark: .byte(255, 120, 196)),
+            defender: AppearanceColor(light: .byte(16, 122, 48), dark: .byte(88, 214, 116)),
+            midfielder: AppearanceColor(light: .byte(24, 78, 184), dark: .byte(112, 168, 255)),
+            forward: AppearanceColor(light: .byte(176, 36, 28), dark: .byte(255, 84, 64))
         )
+
+        static let starbyte = Colors(
+            background: AppearanceColor(light: .byte(6, 24, 14), dark: .byte(0, 0, 0)),
+            text: AppearanceColor(light: .byte(236, 244, 236), dark: .byte(236, 244, 236)),
+            secondaryText: AppearanceColor(light: .byte(154, 184, 164), dark: .byte(154, 184, 164)),
+            action: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
+            actionLabel: AppearanceColor(light: .byte(0, 0, 0), dark: .byte(0, 0, 0)),
+            score: AppearanceColor(light: .byte(255, 208, 64), dark: .byte(255, 208, 64)),
+            pitch: AppearanceColor(light: .byte(22, 120, 48), dark: .byte(22, 120, 48)),
+            pitchLine: AppearanceColor(light: .byte(255, 255, 255), dark: .byte(255, 255, 255)),
+            card: AppearanceColor(light: .byte(10, 36, 22), dark: .byte(8, 16, 12)),
+            hairline: AppearanceColor(light: .byte(40, 90, 64), dark: .byte(40, 90, 64)),
+            shadow: AppearanceColor(light: .byte(0, 0, 0), dark: .byte(0, 0, 0)),
+            danger: AppearanceColor(light: .byte(255, 72, 64), dark: .byte(255, 72, 64)),
+            fitnessGreen: AppearanceColor(light: .byte(80, 230, 110), dark: .byte(80, 230, 110)),
+            fitnessYellow: AppearanceColor(light: .byte(255, 210, 64), dark: .byte(255, 210, 64)),
+            fitnessOrange: AppearanceColor(light: .byte(255, 140, 40), dark: .byte(255, 140, 40)),
+            fitnessRed: AppearanceColor(light: .byte(255, 80, 72), dark: .byte(255, 80, 72)),
+            ticker: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
+            tickerBackground: AppearanceColor(light: .byte(0, 0, 0), dark: .byte(0, 0, 0)),
+            title: AppearanceColor(light: .byte(126, 231, 255), dark: .byte(126, 231, 255)),
+            keeper: AppearanceColor(light: .byte(255, 105, 190), dark: .byte(255, 105, 190)),
+            defender: AppearanceColor(light: .byte(64, 220, 90), dark: .byte(64, 220, 90)),
+            midfielder: AppearanceColor(light: .byte(80, 150, 255), dark: .byte(80, 150, 255)),
+            forward: AppearanceColor(light: .byte(255, 72, 48), dark: .byte(255, 72, 48))
+        )
+
+        func color(for position: Position) -> Color {
+            switch position {
+            case .keeper: keeper.color
+            case .defender: defender.color
+            case .midfielder: midfielder.color
+            case .forward: forward.color
+            }
+        }
+
+        func color(labeled name: String) -> Color {
+            if let position = Position(labeled: name) {
+                color(for: position)
+            } else {
+                title.color
+            }
+        }
     }
 
-    /// Text styles, not point sizes, so Dynamic Type still applies. Names and buttons stay the system font.
+    /// Text styles, not point sizes, so Dynamic Type still applies.
     struct TypeScale: Equatable, Sendable {
         var eyebrow: Font
         var display: Font
@@ -83,7 +146,7 @@ extension Theme {
         var minute: Font
         var ticker: Font
 
-        static let starbyte = TypeScale(
+        static let `default` = TypeScale(
             eyebrow: .system(.caption, design: .default, weight: .semibold).smallCaps(),
             display: .system(.largeTitle, design: .rounded, weight: .black),
             clubName: .system(.title2, design: .rounded, weight: .bold),
@@ -103,6 +166,28 @@ extension Theme {
             minute: .system(.title3, design: .monospaced, weight: .semibold),
             ticker: .system(.body, design: .monospaced, weight: .regular)
         )
+
+        /// Sizes stay near the system roles so a squad list still fits. Dynamic Type scales them.
+        static let starbyte = TypeScale(
+            eyebrow: PixelFont.font(11, relativeTo: .caption),
+            display: PixelFont.font(22, relativeTo: .title, bold: true),
+            clubName: PixelFont.font(16, relativeTo: .title2, bold: true),
+            tagline: PixelFont.font(13, relativeTo: .title3),
+            body: PixelFont.font(12, relativeTo: .body),
+            playerName: PixelFont.font(12, relativeTo: .body),
+            playerOverall: PixelFont.font(12, relativeTo: .body),
+            button: PixelFont.font(13, relativeTo: .body, bold: true),
+            rating: PixelFont.font(11, relativeTo: .subheadline),
+            overall: PixelFont.font(12, relativeTo: .subheadline),
+            homeLine: PixelFont.font(11, relativeTo: .subheadline),
+            opponentName: PixelFont.font(14, relativeTo: .title3, bold: true),
+            captionNumber: PixelFont.font(11, relativeTo: .caption),
+            score: PixelFont.font(18, relativeTo: .title, bold: true),
+            scoreHero: PixelFont.font(26, relativeTo: .largeTitle, bold: true),
+            scoreSide: PixelFont.font(13, relativeTo: .title3, bold: true),
+            minute: PixelFont.font(13, relativeTo: .title3),
+            ticker: PixelFont.font(12, relativeTo: .body)
+        )
     }
 
     struct Space: Equatable, Sendable {
@@ -114,6 +199,7 @@ extension Theme {
         var xl: CGFloat
         var xxl: CGFloat
 
+        static let `default` = Space(xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48)
         static let starbyte = Space(xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48)
     }
 
@@ -135,8 +221,10 @@ extension Theme {
         var crest: CGFloat
         /// Crest beside a club name in a title.
         var crestMark: CGFloat
+        /// Hard pixel borders, rules, and bar chrome. The light look leaves this off.
+        var pixelChrome: Bool
 
-        static let starbyte = Metrics(
+        static let `default` = Metrics(
             minimumControl: 44,
             readingWidth: 680,
             cardRadius: 16,
@@ -151,7 +239,27 @@ extension Theme {
             emptyMinHeight: 220,
             ballMinimum: 10,
             crest: 28,
-            crestMark: 44
+            crestMark: 44,
+            pixelChrome: false
+        )
+
+        static let starbyte = Metrics(
+            minimumControl: 44,
+            readingWidth: 680,
+            cardRadius: 0,
+            buttonRadius: 0,
+            tickerRadius: 0,
+            pitchRadius: 0,
+            accentBar: 4,
+            hairline: 2,
+            pitchLine: 2,
+            shadowRadius: 0,
+            shadowY: 0,
+            emptyMinHeight: 220,
+            ballMinimum: 10,
+            crest: 28,
+            crestMark: 44,
+            pixelChrome: true
         )
     }
 }
@@ -161,12 +269,16 @@ struct AppearanceColor: Equatable, Sendable {
     var dark: RGB
 
     var color: Color {
+        Color(uiColor: uiColor)
+    }
+
+    var uiColor: UIColor {
         let light = light
         let dark = dark
-        return Color(uiColor: UIColor { traits in
+        return UIColor { traits in
             let channel = traits.userInterfaceStyle == .dark ? dark : light
             return channel.uiColor
-        })
+        }
     }
 }
 
@@ -206,32 +318,6 @@ extension KitColor {
     }
 }
 
-struct ThemeDangerButtonStyle: ButtonStyle {
-    @Environment(\.theme) private var theme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(theme.type.button)
-            .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl)
-            .foregroundStyle(theme.colors.actionLabel.color)
-            .background(theme.colors.danger.color)
-            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.buttonRadius, style: .continuous))
-    }
-}
-
-struct ThemeActionButtonStyle: ButtonStyle {
-    @Environment(\.theme) private var theme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(theme.type.button)
-            .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl)
-            .foregroundStyle(theme.colors.actionLabel.color)
-            .background(theme.colors.action.color)
-            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.buttonRadius, style: .continuous))
-    }
-}
-
 private struct ThemeScreenModifier: ViewModifier {
     @Environment(\.theme) private var theme
 
@@ -250,6 +336,12 @@ private struct ThemeCardModifier: ViewModifier {
             .padding(theme.space.md)
             .background(theme.colors.card.color)
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+            .overlay {
+                if theme.metrics.pixelChrome {
+                    Rectangle()
+                        .strokeBorder(theme.colors.title.color, lineWidth: 2)
+                }
+            }
             .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
     }
 }
@@ -264,6 +356,19 @@ private struct ReadingWidthModifier: ViewModifier {
     }
 }
 
+private struct PixelHeaderModifier: ViewModifier {
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        VStack(alignment: .leading, spacing: theme.space.xs) {
+            content
+            if theme.metrics.pixelChrome {
+                PixelRule()
+            }
+        }
+    }
+}
+
 extension View {
     func themeScreen() -> some View {
         modifier(ThemeScreenModifier())
@@ -275,5 +380,9 @@ extension View {
 
     func readingWidth() -> some View {
         modifier(ReadingWidthModifier())
+    }
+
+    func pixelHeader() -> some View {
+        modifier(PixelHeaderModifier())
     }
 }

@@ -71,10 +71,12 @@ struct PlayerDetailView: View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
             Text(positionName)
                 .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.action.color)
+                .foregroundStyle(theme.colors.color(for: store.player.position))
             Text(store.player.fullName)
                 .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+                .foregroundStyle(theme.colors.title.color)
+                .lineLimit(2)
+                .minimumScaleFactor(0.5)
             HStack(spacing: theme.space.sm) {
                 ClubCrest(clubID: store.clubID)
                 Text(store.clubName)
@@ -102,6 +104,7 @@ struct PlayerDetailView: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     private var experience: some View {

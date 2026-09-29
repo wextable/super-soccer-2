@@ -12,7 +12,10 @@ struct SubstitutionView: View {
                 VStack(alignment: .leading, spacing: theme.space.lg) {
                     Text(store.subject.fullName)
                         .font(theme.type.clubName)
-                        .foregroundStyle(theme.colors.text.color)
+                        .foregroundStyle(theme.colors.title.color)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.5)
+                        .pixelHeader()
                     candidates
                 }
                 .padding(theme.space.lg)

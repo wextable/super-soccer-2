@@ -32,12 +32,15 @@ struct ClubSelectionView: View {
                 .foregroundStyle(theme.colors.action.color)
             Text("Take a club")
                 .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+                .foregroundStyle(theme.colors.title.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
             Text("The shirt is real. The names are not.")
                 .font(theme.type.tagline)
                 .foregroundStyle(theme.colors.secondaryText.color)
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     @ViewBuilder
@@ -84,7 +87,9 @@ struct ClubSelectionView: View {
                     ClubCrest(clubID: club.id, scale: .mark)
                     Text(club.name)
                         .font(theme.type.clubName)
-                        .foregroundStyle(theme.colors.text.color)
+                        .foregroundStyle(theme.colors.title.color)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: theme.space.sm)
                     Text(role(of: club))
@@ -113,6 +118,12 @@ struct ClubSelectionView: View {
                     .frame(width: theme.metrics.accentBar)
             }
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+            .overlay {
+                if theme.metrics.pixelChrome {
+                    Rectangle()
+                        .strokeBorder(theme.colors.title.color, lineWidth: 2)
+                }
+            }
             .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
         }
         .buttonStyle(.plain)

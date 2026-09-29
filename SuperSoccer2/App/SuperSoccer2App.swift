@@ -3,6 +3,10 @@ import SwiftUI
 
 @main
 struct SuperSoccer2App: App {
+    init() {
+        PixelFont.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             if !TestRuntime.isRunningTests {
@@ -19,13 +23,19 @@ struct SuperSoccer2App: App {
 struct AppView: View {
     @Bindable var store: StoreOf<AppFeature>
 
-    /// The look for every screen. A future theme replaces this value and nothing else.
+    /// The look for every screen. `Theme.default` is the light and dark look.
     private let theme = Theme.starbyte
 
     var body: some View {
         root
             .tint(theme.colors.action.color)
             .environment(\.theme, theme)
+            .overlay {
+                if store.splash.isPresented {
+                    SplashView(store: store.scope(state: \.splash, action: \.splash))
+                }
+            }
+            .onAppear { theme.installNavigationChrome() }
     }
 
     /// No career yet: the front door is the first screen. A career makes the tab bar the root.

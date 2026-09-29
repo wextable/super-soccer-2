@@ -15,7 +15,75 @@ struct WeekCard<Content: View>: View {
         .padding(.horizontal, theme.space.md)
         .background(theme.colors.card.color)
         .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
+        .overlay {
+            if theme.metrics.pixelChrome {
+                Rectangle()
+                    .strokeBorder(theme.colors.title.color, lineWidth: 2)
+            }
+        }
         .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
+    }
+}
+
+/// Short position ink. The column is as wide as the longest code, so the names line up.
+struct PositionMark: View {
+    @Environment(\.theme) private var theme
+    var position: Position
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(Position.allCases, id: \.self) { item in
+                Text(item.label)
+                    .font(theme.type.captionNumber)
+                    .lineLimit(1)
+                    .hidden()
+            }
+            Text(position.label)
+                .font(theme.type.captionNumber)
+                .foregroundStyle(theme.colors.color(for: position))
+                .lineLimit(1)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A section name. The pixel look puts a cyan rule under it.
+struct SectionLabel: View {
+    @Environment(\.theme) private var theme
+    var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.space.xxs) {
+            Text(text)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.metrics.pixelChrome ? theme.colors.title.color : theme.colors.secondaryText.color)
+            if theme.metrics.pixelChrome {
+                PixelRule()
+                    .frame(width: 72)
+            }
+        }
+    }
+}
+
+/// A broken cyan rule. The light look does not use it.
+struct PixelRule: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Canvas { context, size in
+            let color = theme.colors.title.color
+            let block: CGFloat = 6
+            let gap: CGFloat = 3
+            var x: CGFloat = 0
+            while x < size.width {
+                let width = min(block, size.width - x)
+                let rect = CGRect(x: x, y: 0, width: width, height: size.height)
+                context.fill(Path(rect), with: .color(color))
+                x += block + gap
+            }
+        }
+        .frame(height: 4)
+        .accessibilityHidden(true)
     }
 }
 
@@ -148,24 +216,20 @@ struct RatingBar: View {
                     let scale = width / CGFloat(RatingTrack.trackPoints)
                     let trackWidth = min(width, scale * CGFloat(max(track.ceiling, 0)))
                     ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(theme.colors.hairline.color)
-                            .frame(width: trackWidth, height: proxy.size.height)
+                        bar(trackWidth, height: proxy.size.height, color: theme.colors.hairline.color)
                         if track.markedPoints > 0 {
-                            Capsule()
-                                .fill(markColor)
-                                .frame(
-                                    width: min(trackWidth, scale * CGFloat(track.filledPoints + track.markedPoints)),
-                                    height: proxy.size.height
-                                )
+                            bar(
+                                min(trackWidth, scale * CGFloat(track.filledPoints + track.markedPoints)),
+                                height: proxy.size.height,
+                                color: markColor
+                            )
                         }
                         if track.filledPoints > 0 {
-                            Capsule()
-                                .fill(theme.colors.action.color)
-                                .frame(
-                                    width: min(trackWidth, scale * CGFloat(track.filledPoints)),
-                                    height: proxy.size.height
-                                )
+                            bar(
+                                min(trackWidth, scale * CGFloat(track.filledPoints)),
+                                height: proxy.size.height,
+                                color: theme.colors.action.color
+                            )
                         }
                     }
                     .frame(width: width, height: proxy.size.height, alignment: .leading)
@@ -180,14 +244,24 @@ struct RatingBar: View {
         case .growth: theme.colors.score.color
         }
     }
+
+    private func bar(_ width: CGFloat, height: CGFloat, color: Color) -> some View {
+        RoundedRectangle(cornerRadius: theme.metrics.pixelChrome ? 0 : height / 2, style: .continuous)
+            .fill(color)
+            .frame(width: max(width, 0), height: height)
+    }
 }
 
 struct WeekHairline: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Rectangle()
-            .fill(theme.colors.hairline.color)
-            .frame(height: theme.metrics.hairline)
+        if theme.metrics.pixelChrome {
+            PixelRule()
+        } else {
+            Rectangle()
+                .fill(theme.colors.hairline.color)
+                .frame(height: theme.metrics.hairline)
+        }
     }
 }

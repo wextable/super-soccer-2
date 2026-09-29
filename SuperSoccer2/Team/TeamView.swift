@@ -66,7 +66,9 @@ struct TeamScreen: View {
                 ClubCrest(clubID: club.id, scale: .mark)
                 Text(club.name)
                     .font(theme.type.display)
-                    .foregroundStyle(theme.colors.text.color)
+                    .foregroundStyle(theme.colors.title.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
@@ -88,16 +90,15 @@ struct TeamScreen: View {
                 .font(theme.type.overall)
                 .foregroundStyle(theme.colors.text.color)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     private var injuries: some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text("Injuries")
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
+            SectionLabel(text: "Injuries")
             WeekCard {
                 ForEach(Array(club.injuryLines.enumerated()), id: \.offset) { index, line in
                     HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
@@ -121,9 +122,7 @@ struct TeamScreen: View {
 
     private func roster(title: String, players: [Player]) -> some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text(title)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
+            SectionLabel(text: title)
             if players.isEmpty {
                 Text(title == "Bench" ? "The bench is empty." : "No one is starting.")
                     .font(theme.type.body)
@@ -157,18 +156,17 @@ struct TeamScreen: View {
                 onPlayer(player.id)
             } label: {
                 HStack(spacing: theme.space.sm) {
-                    Circle()
+                    RoundedRectangle(cornerRadius: theme.metrics.pixelChrome ? 0 : theme.space.sm / 2, style: .continuous)
                         .fill(bandColor(player))
                         .frame(width: theme.space.sm, height: theme.space.sm)
                         .accessibilityHidden(true)
-                    Text(player.position.label)
-                        .font(theme.type.captionNumber)
-                        .foregroundStyle(theme.colors.secondaryText.color)
-                        .frame(width: theme.metrics.minimumControl, alignment: .leading)
+                    PositionMark(position: player.position)
                     VStack(alignment: .leading, spacing: theme.space.xxs) {
                         Text(player.fullName)
                             .font(theme.type.playerName)
                             .foregroundStyle(theme.colors.text.color)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         Text(mark)
                             .font(theme.type.captionNumber)
                             .foregroundStyle(bandColor(player))

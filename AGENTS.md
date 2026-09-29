@@ -25,7 +25,7 @@ xcodebuild test \
 
 ## Where things live
 
-`AppView` in `SuperSoccer2/App/SuperSoccer2App.swift` installs the theme (`Theme.starbyte` from `SuperSoccer2/Theme.swift`). Screens read `Theme` from the environment.
+`AppView` in `SuperSoccer2/App/SuperSoccer2App.swift` installs the theme (`Theme.starbyte` from `SuperSoccer2/Theme.swift`). Screens read `Theme` from the environment. `Theme.default` is the light and dark look. Swap the value in `AppView` to go back.
 
 `CareerStore` reads and writes the single career file.
 
