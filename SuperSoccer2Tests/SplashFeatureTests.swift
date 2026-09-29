@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Testing
+import UIKit
 @testable import SuperSoccer2
 
 @Suite
@@ -39,6 +40,31 @@ struct SplashFeatureTests {
         await store.send(.view(.tapped)) {
             $0.isPresented = false
         }
+    }
+
+    @Test func theLaunchPictureMatchesTheStarbyteField() {
+        let named = UIColor(named: "LaunchGround")
+        #expect(named != nil)
+        let ground = Theme.starbyte.colors.background
+        expect(named, matches: ground.light, style: .light)
+        expect(named, matches: ground.dark, style: .dark)
+
+        let image = UIImage(named: "LaunchSplash")
+        #expect(image != nil)
+        #expect(image?.size == CGSize(width: SplashCanvas.width, height: SplashCanvas.height))
+    }
+
+    private func expect(_ color: UIColor?, matches channel: RGB, style: UIUserInterfaceStyle) {
+        let resolved = color?.resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        let didRead = resolved?.getRed(&red, green: &green, blue: &blue, alpha: &alpha) ?? false
+        #expect(didRead)
+        #expect(abs(Double(red) - channel.red) < 0.004)
+        #expect(abs(Double(green) - channel.green) < 0.004)
+        #expect(abs(Double(blue) - channel.blue) < 0.004)
     }
 
     @Test func aSecondAppearanceDoesNotBringTheCardBack() async {

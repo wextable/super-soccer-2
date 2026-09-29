@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Original title card: a block trophy, a manager in sunglasses, two celebrating players, and ribbons.
 /// It is an overlay, not a screen in the navigation stack.
+/// The picture is the same raster the launch storyboard centers, so the first frame continues that screen.
 struct SplashView: View {
     let store: StoreOf<SplashFeature>
     @Environment(\.theme) private var theme
@@ -13,32 +14,58 @@ struct SplashView: View {
         } label: {
             ZStack {
                 theme.colors.background.color
-                VStack(spacing: theme.space.lg) {
-                    ribbon("NEW SEASON")
-                    Text("SUPER\nSOCCER")
-                        .font(theme.type.scoreHero)
-                        .foregroundStyle(theme.colors.title.color)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.5)
-                    SplashScene()
-                        .frame(maxWidth: 440)
-                        .frame(height: 240)
-                    ribbon("KICK OFF")
-                    Text("Tap to continue")
-                        .font(theme.type.captionNumber)
-                        .foregroundStyle(theme.colors.secondaryText.color)
-                }
-                .padding(theme.space.lg)
-                .readingWidth()
+                Image("LaunchSplash")
+                    .renderingMode(.original)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
+            .clipped()
         }
         .buttonStyle(.plain)
         .ignoresSafeArea()
         .onAppear { store.send(.view(.appeared)) }
         .accessibilityLabel("Super Soccer")
         .accessibilityHint("Dismisses the title screen")
+    }
+}
+
+/// iPhone 17 points. The launch image is this canvas, centered, so the first frame meets the launch screen.
+enum SplashCanvas {
+    static let width: CGFloat = 402
+    static let height: CGFloat = 874
+}
+
+/// Source of `LaunchSplash`. Rendered at `SplashCanvas` with `showsGround` off; the launch color paints the field.
+struct SplashArtwork: View {
+    var showsGround = true
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        ZStack {
+            if showsGround {
+                theme.colors.background.color
+            }
+            VStack(spacing: theme.space.lg) {
+                ribbon("NEW SEASON")
+                Text("SUPER\nSOCCER")
+                    .font(theme.type.scoreHero)
+                    .foregroundStyle(theme.colors.title.color)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.5)
+                SplashScene()
+                    .frame(maxWidth: 440)
+                    .frame(height: 240)
+                ribbon("KICK OFF")
+                Text("Tap to continue")
+                    .font(theme.type.captionNumber)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+            }
+            .padding(theme.space.lg)
+            .readingWidth()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func ribbon(_ text: String) -> some View {

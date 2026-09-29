@@ -169,24 +169,24 @@ extension Theme {
 
         /// Body, lists, and buttons are phone-readable. Titles stay a step above that, not a poster.
         static let starbyte = TypeScale(
-            eyebrow: PixelFont.font(15, relativeTo: .caption),
-            display: PixelFont.font(24, relativeTo: .title),
-            clubName: PixelFont.font(22, relativeTo: .title2),
-            tagline: PixelFont.font(17, relativeTo: .title3),
-            body: PixelFont.font(20, relativeTo: .body),
-            playerName: PixelFont.font(20, relativeTo: .body),
-            playerOverall: PixelFont.font(20, relativeTo: .body),
-            button: PixelFont.font(20, relativeTo: .body),
-            rating: PixelFont.font(17, relativeTo: .subheadline),
-            overall: PixelFont.font(18, relativeTo: .subheadline),
-            homeLine: PixelFont.font(17, relativeTo: .subheadline),
-            opponentName: PixelFont.font(20, relativeTo: .title3),
-            captionNumber: PixelFont.font(16, relativeTo: .caption),
-            score: PixelFont.font(22, relativeTo: .title),
-            scoreHero: PixelFont.font(26, relativeTo: .largeTitle),
-            scoreSide: PixelFont.font(18, relativeTo: .title3),
-            minute: PixelFont.font(18, relativeTo: .title3),
-            ticker: PixelFont.font(17, relativeTo: .body)
+            eyebrow: PixelFont.font(17, relativeTo: .caption),
+            display: PixelFont.font(26, relativeTo: .title),
+            clubName: PixelFont.font(24, relativeTo: .title2),
+            tagline: PixelFont.font(19, relativeTo: .title3),
+            body: PixelFont.font(22, relativeTo: .body),
+            playerName: PixelFont.font(22, relativeTo: .body),
+            playerOverall: PixelFont.font(22, relativeTo: .body),
+            button: PixelFont.font(22, relativeTo: .body),
+            rating: PixelFont.font(19, relativeTo: .subheadline),
+            overall: PixelFont.font(20, relativeTo: .subheadline),
+            homeLine: PixelFont.font(19, relativeTo: .subheadline),
+            opponentName: PixelFont.font(22, relativeTo: .title3),
+            captionNumber: PixelFont.font(18, relativeTo: .caption),
+            score: PixelFont.font(24, relativeTo: .title),
+            scoreHero: PixelFont.font(28, relativeTo: .largeTitle),
+            scoreSide: PixelFont.font(20, relativeTo: .title3),
+            minute: PixelFont.font(20, relativeTo: .title3),
+            ticker: PixelFont.font(19, relativeTo: .body)
         )
     }
 
