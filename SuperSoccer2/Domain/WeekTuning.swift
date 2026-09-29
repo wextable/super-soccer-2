@@ -87,6 +87,14 @@ struct Development: Equatable, Sendable {
     var growth: Growth
 }
 
+/// Level already earned, skills already counted, and the experience left before the next level.
+/// The three stay on the same cost curve. Generating them does not add rating points.
+struct OpeningProgress: Equatable, Sendable {
+    var level: Int
+    var skillsEarned: Int
+    var xp: Int
+}
+
 /// Weights for the week between matches. A later settings screen can bind each field.
 /// The goal-mean constants stay on `MatchTuning`.
 struct WeekTuning: Equatable, Sendable {
@@ -120,7 +128,6 @@ struct WeekTuning: Equatable, Sendable {
     var xpForKeeperCleanSheet: Int
     var xpForDefenderCleanSheet: Int
     /// Experience for the first level. Later levels cost this plus `extraXpPerSkill` times levels already earned.
-    /// The draft places each player somewhere below this, so the same gain does not level the whole side in one week.
     var xpForFirstSkill: Int
     var extraXpPerSkill: Int
     var skillPointsSpeed: Int
@@ -163,6 +170,16 @@ struct WeekTuning: Equatable, Sendable {
     var highSlowWeight: Int
     var highMedWeight: Int
     var highFastWeight: Int
+    /// How hard age pulls the starting level. A young player stays low.
+    var startingLevelAgeWeight: Int
+    /// How hard closeness to the ceilings pulls the starting level. Far below stays low.
+    var startingLevelCeilingWeight: Int
+    /// Highest level the draft can hand a new player.
+    var startingLevelCap: Int
+    /// Steps either side of the blended level, so similar players do not land on one number.
+    var startingLevelSpread: Int
+    /// Mean room, in rating points, that still counts as far below the ceilings.
+    var startingLevelRoom: Int
     /// Mixed into the league seed so age, potential, and growth do not move the rating generator.
     var traitSalt: UInt64
 
@@ -226,6 +243,11 @@ struct WeekTuning: Equatable, Sendable {
         highSlowWeight: 15,
         highMedWeight: 40,
         highFastWeight: 45,
+        startingLevelAgeWeight: 45,
+        startingLevelCeilingWeight: 55,
+        startingLevelCap: 10,
+        startingLevelSpread: 2,
+        startingLevelRoom: 30,
         traitSalt: 0xA6E1_5A7E
     )
 
@@ -350,10 +372,66 @@ struct WeekTuning: Equatable, Sendable {
         return options[0].0
     }
 
-    /// Experience already on the clock when the player is drafted. Below the first skill, and different for each id.
+    /// Personal slot below the first level. Different for each id. The draft scales it onto the starting level.
     func openingXP(for playerID: String) -> Int {
         let span = max(xpForFirstSkill, 1)
         return Int(Self.mix(playerID, salt: 0x5850) % UInt64(span))
+    }
+
+    /// Level, skills already earned, and the experience still left on this level.
+    /// The ratings stay as they were generated. The next level still costs `requiredXP`.
+    func openingProgress(
+        age: Int,
+        ratings: Ratings,
+        potential: Potential,
+        playerID: String
+    ) -> OpeningProgress {
+        let level = startingLevel(age: age, ratings: ratings, potential: potential, playerID: playerID)
+        return OpeningProgress(
+            level: level,
+            skillsEarned: level,
+            xp: leftoverXP(level: level, playerID: playerID)
+        )
+    }
+
+    /// Where a new player starts. Young and far from the ceilings stays low. Older and close to them sits higher.
+    func startingLevel(age: Int, ratings: Ratings, potential: Potential, playerID: String) -> Int {
+        let cap = max(startingLevelCap, 0)
+        let ageWeight = max(startingLevelAgeWeight, 0)
+        let ceilingWeight = max(startingLevelCeilingWeight, 0)
+        let weight = max(ageWeight + ceilingWeight, 1)
+        let blended = (ageWeight * ageThousandths(age) + ceilingWeight * ceilingThousandths(ratings: ratings, potential: potential)) / weight
+        let base = (blended * cap + 500) / 1000
+        let spread = max(startingLevelSpread, 0)
+        let slot = spread == 0 ? 0 : Int(Self.mix(playerID, salt: 0x4C56) % UInt64(spread + 1))
+        let nudged = base - spread / 2 + slot
+        return min(cap, max(0, nudged))
+    }
+
+    /// Experience left before the next level. The personal slot is `openingXP`, scaled onto this level's cost, and it stays under that cost.
+    func leftoverXP(level: Int, playerID: String) -> Int {
+        let span = max(xpForFirstSkill, 1)
+        let cost = max(requiredXP(level: level), 1)
+        let leftover = openingXP(for: playerID) * cost / span
+        return min(leftover, cost - 1)
+    }
+
+    /// 0 at the youngest age, 1000 at the oldest.
+    private func ageThousandths(_ age: Int) -> Int {
+        let span = max(oldestAge - youngestAge, 1)
+        let years = min(max(age, youngestAge), oldestAge) - youngestAge
+        return years * 1000 / span
+    }
+
+    /// 0 when the mean room is the far gap. 1000 when every rating is already on its ceiling.
+    private func ceilingThousandths(ratings: Ratings, potential: Potential) -> Int {
+        let count = PlayerStat.allCases.count
+        let span = max(startingLevelRoom, 1)
+        let room = PlayerStat.allCases.reduce(0) { sum, stat in
+            sum + max(0, potential.value(for: stat) - ratings.value(for: stat))
+        }
+        let far = min(1000, room * 1000 / (count * span))
+        return 1000 - far
     }
 
     /// Thousandths of a condition point this player loses per start.

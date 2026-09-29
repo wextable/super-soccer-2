@@ -31,6 +31,11 @@ struct Club: Codable, Equatable, Sendable, Identifiable {
         players.filter { !$0.isStarter }
     }
 
+    /// Starting, then the bench. The club screen lists the squad in this order.
+    var listedPlayers: [Player] {
+        starters + bench
+    }
+
     var keeper: Player {
         starters.first { $0.position == .keeper } ?? starters[0]
     }

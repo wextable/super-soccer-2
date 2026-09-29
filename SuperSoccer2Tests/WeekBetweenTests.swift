@@ -369,7 +369,12 @@ struct WeekBetweenTests {
             let user = try #require(season.clubs.first { $0.id == userID })
             let opening = user.players.map(\.xp)
             #expect(Set(opening).count > 1)
-            #expect(opening.allSatisfy { $0 >= 0 && $0 < tuning.xpForFirstSkill })
+            #expect(Set(user.players.map(\.level)).count > 1)
+            #expect(user.players.allSatisfy { player in
+                player.skillsEarned == player.level
+                    && player.xp >= 0
+                    && player.xp < tuning.requiredXP(level: player.level)
+            })
             var clubs = season.clubs
             var maxOffers = 0
             var totalOffers = 0

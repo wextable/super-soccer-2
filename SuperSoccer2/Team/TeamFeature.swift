@@ -48,7 +48,8 @@ struct TeamFeature {
                     player: player,
                     clubName: state.club.name,
                     clubID: state.club.id,
-                    showsExperience: state.canManage
+                    showsExperience: state.canManage,
+                    roster: state.canManage ? state.club.listedPlayers : nil
                 )
                 return .none
 

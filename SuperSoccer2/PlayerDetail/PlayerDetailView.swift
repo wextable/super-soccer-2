@@ -8,6 +8,9 @@ struct PlayerDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.space.lg) {
+                if let role = store.roleLine {
+                    pager(role)
+                }
                 header
                 if store.showsExperience {
                     experience
@@ -20,6 +23,48 @@ struct PlayerDetailView: View {
         .themeScreen()
         .navigationTitle(store.player.fullName)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func pager(_ role: String) -> some View {
+        HStack(spacing: theme.space.sm) {
+            stepButton(
+                "chevron.left",
+                label: "Previous player",
+                enabled: store.canShowPreviousPlayer
+            ) {
+                store.send(.view(.previousPlayerTapped))
+            }
+            Text(role)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            stepButton(
+                "chevron.right",
+                label: "Next player",
+                enabled: store.canShowNextPlayer
+            ) {
+                store.send(.view(.nextPlayerTapped))
+            }
+        }
+    }
+
+    private func stepButton(
+        _ systemName: String,
+        label: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(theme.type.button)
+                .frame(minWidth: theme.metrics.minimumControl, minHeight: theme.metrics.minimumControl)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? theme.colors.action.color : theme.colors.secondaryText.color)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
     }
 
     private var header: some View {
