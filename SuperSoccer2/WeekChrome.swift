@@ -199,12 +199,20 @@ struct GrowthReading: View {
 /// Growth and lost fitness sit inside the track. The same rating is the same fill, whatever the ceiling.
 struct RatingBar: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var track: RatingTrack
     var mark: Mark
+    /// Pulses the stretch this skill would still add. Other bars leave it off.
+    var pulsesMark: Bool = false
+    @State private var pulse = false
 
     enum Mark {
         case condition
         case growth
+    }
+
+    private var pulses: Bool {
+        pulsesMark && !reduceMotion && track.markedPoints > 0
     }
 
     var body: some View {
@@ -223,6 +231,7 @@ struct RatingBar: View {
                                 height: proxy.size.height,
                                 color: markColor
                             )
+                            .opacity(pulses ? (pulse ? 1 : 0.32) : 1)
                         }
                         if track.filledPoints > 0 {
                             bar(
@@ -236,6 +245,25 @@ struct RatingBar: View {
                 }
             }
             .accessibilityHidden(true)
+            .onAppear(perform: restartPulse)
+            .onChange(of: pulses) { _, _ in
+                restartPulse()
+            }
+    }
+
+    private func restartPulse() {
+        guard pulses else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                pulse = false
+            }
+            return
+        }
+        pulse = false
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+            pulse = true
+        }
     }
 
     private var markColor: Color {
@@ -262,6 +290,29 @@ struct WeekHairline: View {
             Rectangle()
                 .fill(theme.colors.hairline.color)
                 .frame(height: theme.metrics.hairline)
+        }
+    }
+}
+
+/// “1 of 2”, then a rule. One step still draws the rule under the line above it.
+struct StepCountRule: View {
+    @Environment(\.theme) private var theme
+    var step: Int
+    var stepCount: Int
+    var centered: Bool = false
+
+    var body: some View {
+        VStack(alignment: centered ? .center : .leading, spacing: theme.space.xs) {
+            if stepCount > 1 {
+                Text("\(step) of \(stepCount)")
+                    .font(theme.type.eyebrow)
+                    .foregroundStyle(theme.colors.secondaryText.color)
+                    .multilineTextAlignment(centered ? .center : .leading)
+                    .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
+                    .contentTransition(.numericText())
+            }
+            WeekHairline()
+                .accessibilityHidden(true)
         }
     }
 }

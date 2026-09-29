@@ -1,5 +1,7 @@
+import AVFoundation
 import ComposableArchitecture
 import Foundation
+import os
 import Testing
 @testable import SuperSoccer2
 
@@ -155,25 +157,28 @@ struct SkillChoiceLimitTests {
             condition: 100,
             ratings: Ratings(speed: 80, shooting: 99, passing: 70, dribbling: 80, defending: 97, goalkeeping: 40)
         )
-        let store = TestStore(
-            initialState: SkillChoiceFeature.State(
-                offerID: "offer",
-                player: player,
-                choices: WeekTuning.current.skillChoices,
-                step: 1,
-                stepCount: 1,
-                contextLine: "Before the next week"
-            )
-        ) {
-            SkillChoiceFeature()
-        }
+        let clock = TestClock()
+        let store = skillStore(player: player, clock: clock)
 
-        await store.send(.view(.statTapped(.shooting)))
+        await store.send(.view(.statTapped(.shooting, reduceMotion: false)))
         let defending = try #require(WeekTuning.current.skillChoices.first { $0.stat == .defending })
-        let projection = SkillProjection.make(current: 97, boost: defending.points)
+        let projection = SkillProjection.make(current: 97, boost: defending.points, ceiling: player.potential.defending)
         #expect(projection.reading == "97→99")
-        await store.send(.view(.statTapped(.defending)))
+        await store.send(.view(.statTapped(.defending, reduceMotion: false))) {
+            $0.selectedStat = .defending
+            $0.phase = .selected
+        }
+        await clock.advance(by: SkillChoiceFeature.selectBeat)
+        await store.receive(\.internal.grow) {
+            $0.phase = .growing
+        }
+        await clock.advance(by: SkillChoiceFeature.growBeat)
+        await store.receive(\.internal.grown) {
+            $0.phase = .grown
+        }
+        await store.send(.view(.continueTapped))
         await store.receive(\.delegate.chose, .defending)
+        await store.finish()
     }
 
     @Test func aStatAtItsCeilingCannotBeChosen() async throws {
@@ -186,20 +191,10 @@ struct SkillChoiceLimitTests {
             ratings: Ratings(speed: 80, shooting: 70, passing: 70, dribbling: 80, defending: 60, goalkeeping: 40)
         )
         player.potential.shooting = 70
-        let store = TestStore(
-            initialState: SkillChoiceFeature.State(
-                offerID: "offer",
-                player: player,
-                choices: WeekTuning.current.skillChoices,
-                step: 1,
-                stepCount: 1,
-                contextLine: "Before the next week"
-            )
-        ) {
-            SkillChoiceFeature()
-        }
+        let clock = TestClock()
+        let store = skillStore(player: player, clock: clock)
 
-        await store.send(.view(.statTapped(.shooting)))
+        await store.send(.view(.statTapped(.shooting, reduceMotion: false)))
         let passing = try #require(WeekTuning.current.skillChoices.first { $0.stat == .passing })
         let projection = SkillProjection.make(
             current: 70,
@@ -207,8 +202,142 @@ struct SkillChoiceLimitTests {
             ceiling: player.potential.passing
         )
         #expect(projection.reading == "70→\(70 + passing.points)")
-        await store.send(.view(.statTapped(.passing)))
+        await store.send(.view(.statTapped(.passing, reduceMotion: false))) {
+            $0.selectedStat = .passing
+            $0.phase = .selected
+        }
+        await store.send(.view(.continueTapped))
+        await clock.advance(by: SkillChoiceFeature.selectBeat)
+        await store.receive(\.internal.grow) {
+            $0.phase = .growing
+        }
+        #expect(store.state.displayedOverall == player.overall)
+        await clock.advance(by: SkillChoiceFeature.growBeat)
+        await store.receive(\.internal.grown) {
+            $0.phase = .grown
+        }
+        await store.send(.view(.continueTapped))
         await store.receive(\.delegate.chose, .passing)
+        await store.finish()
+    }
+
+    @Test func theOverallMovesWhenTheBarFinishes() async throws {
+        let player = Player(
+            id: "p",
+            firstName: "Ada",
+            lastName: "Ball",
+            position: .forward,
+            condition: 100,
+            ratings: Ratings(speed: 80, shooting: 70, passing: 70, dribbling: 70, defending: 50, goalkeeping: 40)
+        )
+        let points = WeekTuning.current.points(for: .shooting)
+        var grown = player
+        grown.ratings.shooting += points
+        #expect(grown.overall != player.overall)
+        let plays = OSAllocatedUnfairLock(initialState: 0)
+        let clock = TestClock()
+        let store = skillStore(player: player, clock: clock) {
+            $0.levelUpSound.play = {
+                plays.withLock { $0 += 1 }
+                return
+            }
+        }
+
+        #expect(store.state.displayedOverall == player.overall)
+        #expect(store.state.reason == "Ada Ball was practicing late at night all week long.")
+        #expect(store.state.instruction == "Pick one stat")
+        await store.send(.view(.statTapped(.shooting, reduceMotion: false))) {
+            $0.selectedStat = .shooting
+            $0.phase = .selected
+        }
+        #expect(store.state.displayedOverall == player.overall)
+        await store.send(.view(.statTapped(.passing, reduceMotion: false)))
+        await clock.advance(by: SkillChoiceFeature.selectBeat)
+        await store.receive(\.internal.grow) {
+            $0.phase = .growing
+        }
+        #expect(store.state.displayedOverall == player.overall)
+        await clock.advance(by: .milliseconds(519))
+        #expect(store.state.phase == .growing)
+        await clock.advance(by: .milliseconds(1))
+        await store.receive(\.internal.grown) {
+            $0.phase = .grown
+        }
+        #expect(plays.withLock { $0 } == 1)
+        #expect(store.state.displayedOverall == grown.overall)
+        #expect(store.state.instruction == "His Shooting has really improved.")
+        #expect(store.state.player.ratings == player.ratings)
+        await store.send(.view(.continueTapped))
+        await store.receive(\.delegate.chose, .shooting)
+        await store.finish()
+    }
+
+    @Test func reducedMotionStillWaitsToBeDismissed() async throws {
+        let player = Player(
+            id: "p",
+            firstName: "Ada",
+            lastName: "Ball",
+            position: .forward,
+            condition: 100,
+            ratings: Ratings(speed: 80, shooting: 70, passing: 70, dribbling: 70, defending: 50, goalkeeping: 40)
+        )
+        let store = skillStore(player: player, clock: TestClock())
+        await store.send(.view(.statTapped(.shooting, reduceMotion: true))) {
+            $0.selectedStat = .shooting
+            $0.phase = .grown
+        }
+        #expect(store.state.displayedOverall == store.state.overall(after: .shooting))
+        await store.send(.view(.continueTapped))
+        await store.receive(\.delegate.chose, .shooting)
+        await store.finish()
+    }
+}
+
+@Suite
+struct LevelUpCopyTests {
+    @Test func theOldLinesStayAndAnOfferKeepsItsSentence() {
+        #expect(LevelUpCopy.lines.count == 20)
+        #expect(LevelUpCopy.lines.contains("doesn't fuck around."))
+        #expect(LevelUpCopy.lines.contains("must have had sex this week."))
+        #expect(LevelUpCopy.lines.contains("totally got a blowjob in the parking lot."))
+        #expect(LevelUpCopy.lines.contains("FINALLY got those genital warts removed!"))
+        #expect(LevelUpCopy.line(for: "offer") == "was practicing late at night all week long.")
+        #expect(LevelUpCopy.line(for: "offer-1") == "might have some real potential.")
+        #expect(LevelUpCopy.sentence(name: "Ada Ball", offerID: "one") == "Ada Ball is turning into a stud.")
+        #expect(SkillChoiceFeature.selectBeat == .milliseconds(280))
+        #expect(SkillChoiceFeature.growBeat == .milliseconds(520))
+        #expect(abs(SkillChoiceFeature.growSeconds - 0.52) < 0.000_001)
+    }
+
+    @Test @MainActor func theLevelUpSoundIsAShortClipInTheApp() throws {
+        let bundle = try #require(Bundle(identifier: "dev.personal.SuperSoccer2"))
+        let url = try #require(bundle.url(forResource: "LevelUp", withExtension: "wav"))
+        let player = try AVAudioPlayer(contentsOf: url)
+        #expect(player.duration > 0.2)
+        #expect(player.duration < 0.8)
+    }
+}
+
+@MainActor
+private func skillStore(
+    player: Player,
+    clock: TestClock<Duration>,
+    prepare: (inout DependencyValues) -> Void = { _ in }
+) -> TestStoreOf<SkillChoiceFeature> {
+    TestStore(
+        initialState: SkillChoiceFeature.State(
+            offerID: "offer",
+            player: player,
+            choices: WeekTuning.current.skillChoices,
+            step: 1,
+            stepCount: 1,
+            contextLine: "Before the next week"
+        )
+    ) {
+        SkillChoiceFeature()
+    } withDependencies: {
+        $0.continuousClock = clock
+        prepare(&$0)
     }
 }
 
