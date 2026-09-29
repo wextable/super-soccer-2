@@ -48,8 +48,17 @@ enum LeagueDraft {
                 guard let picked = takePlayer(for: rosters[index], from: &pool) else { continue }
                 var player = picked
                 player.id = "\(templates[index].id)-\(rosters[index].count)"
-                player.xp = WeekTuning.current.openingXP(for: player.id)
-                player.condition = WeekTuning.current.openingCondition(for: player.id)
+                let tuning = WeekTuning.current
+                let progress = tuning.openingProgress(
+                    age: player.age,
+                    ratings: player.ratings,
+                    potential: player.potential,
+                    playerID: player.id
+                )
+                player.level = progress.level
+                player.skillsEarned = progress.skillsEarned
+                player.xp = progress.xp
+                player.condition = tuning.openingCondition(for: player.id)
                 rosters[index].append(player)
                 placed += 1
             }

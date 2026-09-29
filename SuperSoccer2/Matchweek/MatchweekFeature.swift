@@ -416,6 +416,7 @@ struct MatchweekFeature {
             }
             if let teamID = team?.club.id, let club = clubs.first(where: { $0.id == teamID }) {
                 team?.club = club
+                refreshListedPlayer(from: club)
             }
             if let current = player?.player.id, let found = squadPlayer(current) {
                 player = playerDetail(for: found.player, in: found.club)
@@ -490,12 +491,26 @@ struct MatchweekFeature {
         }
 
         func playerDetail(for player: Player, in club: Club) -> PlayerDetailFeature.State {
-            PlayerDetailFeature.State(
+            let isUser = club.id == userClubID
+            return PlayerDetailFeature.State(
                 player: player,
                 clubName: club.name,
                 clubID: club.id,
-                showsExperience: club.id == userClubID
+                showsExperience: isUser,
+                roster: isUser ? club.listedPlayers : nil
             )
+        }
+
+        /// Keeps a club-roster player screen on the same person after the squad changes.
+        mutating func refreshListedPlayer(from club: Club) {
+            guard var screen = team, var detail = screen.player, detail.roster != nil else { return }
+            let current = detail.player.id
+            detail.roster = club.listedPlayers
+            if let fresh = club.listedPlayers.first(where: { $0.id == current }) {
+                detail.player = fresh
+            }
+            screen.player = detail
+            team = screen
         }
 
         func teamScreen(for club: Club) -> TeamFeature.State {
@@ -1007,5 +1022,6 @@ struct MatchweekFeature {
         state.team?.points = screen.points
         state.team?.goalDifference = screen.goalDifference
         state.team?.place = screen.place
+        state.refreshListedPlayer(from: screen.club)
     }
 }

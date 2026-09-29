@@ -348,7 +348,8 @@ struct MatchweekFeatureTests {
         let best = try #require(store.state.opponent?.starters.map(\.overall).max())
         #expect(store.state.keyPlayers.first?.overall == best)
         let club = try #require(store.state.userClub)
-        let player = try #require(club.starters.first)
+        let order = club.listedPlayers
+        let player = try #require(order.first)
         let detail = store.state.playerDetail(for: player, in: club)
 
         await store.send(.view(.tabSelected(.table))) {
@@ -362,6 +363,13 @@ struct MatchweekFeatureTests {
         }
         #expect(store.state.player?.player.fullName == player.fullName)
         #expect(store.state.player?.clubName == "Manchester City")
+        #expect(store.state.player?.roleLine == "Starting")
+        await store.send(.player(.presented(.view(.previousPlayerTapped))))
+        let next = order[1]
+        await store.send(.player(.presented(.view(.nextPlayerTapped)))) {
+            $0.player?.player = next
+        }
+        #expect(store.state.player?.roleLine == (next.isStarter ? "Starting" : "On the bench"))
         await store.send(.player(.dismiss)) {
             $0.player = nil
         }
@@ -371,6 +379,8 @@ struct MatchweekFeatureTests {
             $0.player = PlayerDetailFeature.State(player: key, clubName: opponent.name, clubID: opponent.id)
         }
         #expect(store.state.player?.player.id == key.id)
+        #expect(store.state.player?.roleLine == nil)
+        await store.send(.player(.presented(.view(.nextPlayerTapped))))
         await store.send(.player(.dismiss)) {
             $0.player = nil
         }
@@ -797,14 +807,20 @@ struct MatchweekFeatureTests {
                 canManage: true
             )
         }
-        let cityPlayer = try #require(city.starters.first)
+        let order = city.listedPlayers
+        let cityPlayer = try #require(order.first)
         await store.send(.team(.presented(.view(.playerTapped(cityPlayer.id))))) {
             $0.team?.player = PlayerDetailFeature.State(
                 player: cityPlayer,
                 clubName: city.name,
                 clubID: city.id,
-                showsExperience: true
+                showsExperience: true,
+                roster: order
             )
+        }
+        #expect(store.state.team?.player?.roleLine == "Starting")
+        await store.send(.team(.presented(.player(.presented(.view(.nextPlayerTapped)))))) {
+            $0.team?.player?.player = order[1]
         }
         await store.send(.team(.presented(.player(.dismiss)))) {
             $0.team?.player = nil
@@ -817,6 +833,19 @@ struct MatchweekFeatureTests {
             $0.team = TeamFeature.State(club: other, won: 0, lost: 0, drawn: 0, points: 0, goalDifference: 0)
         }
         #expect(store.state.team?.club.name == other.name)
+        let otherPlayer = try #require(other.listedPlayers.first)
+        await store.send(.team(.presented(.view(.playerTapped(otherPlayer.id))))) {
+            $0.team?.player = PlayerDetailFeature.State(
+                player: otherPlayer,
+                clubName: other.name,
+                clubID: other.id
+            )
+        }
+        #expect(store.state.team?.player?.roleLine == nil)
+        await store.send(.team(.presented(.player(.presented(.view(.nextPlayerTapped))))))
+        await store.send(.team(.presented(.player(.dismiss)))) {
+            $0.team?.player = nil
+        }
         await store.send(.view(.teamButtonTapped("missing")))
         #expect(store.state.team?.club.id == other.id)
     }
