@@ -151,6 +151,8 @@ struct CareerPersistenceTests {
         #expect(week.weekIndex == 4)
         #expect(week.committedWeeks == 4)
         #expect(week.userClubID == "norwich-city")
+        #expect(week.skillChoice == nil)
+        #expect(week.injuryNotice == nil)
         #expect(store.state.selection == nil)
         #expect(store.state.menu == nil)
     }
@@ -288,12 +290,14 @@ struct CareerPersistenceTests {
         #expect(restored.standings == career.standings)
         #expect(restored.record == career.record)
         #expect(restored.skillOffers == career.skillOffers)
-        #expect(restored.playedWeeks == career.playedWeeks ?? [])
+        #expect(restored.playedWeeks == career.playedWeeks)
+        #expect(restored.skillChoice == nil)
+        #expect(restored.injuryNotice == nil)
         #expect(restored.browsedWeekIndex == nil)
         #expect(restored.shownWeekIndex == career.weekIndex)
     }
 
-    @Test func anOlderCareerWithoutPlayedWeeksStillOpensOnTheCurrentWeek() throws {
+    @Test func aCareerMissingCurrentFieldsDoesNotDecode() throws {
         let season = LeagueDraft.makeLeague(seed: 3)
         var career = Career(matchweek: MatchweekFeature.State(userClubID: "everton", season: season))
         career.weekIndex = 4
@@ -303,57 +307,76 @@ struct CareerPersistenceTests {
         ]]
         let encoded = try JSONEncoder().encode(career)
         let decoded = try JSONDecoder().decode(Career.self, from: encoded)
-        #expect(decoded.playedWeeks?.first?.first?.homeScore == 2)
+        #expect(decoded.playedWeeks.first?.first?.homeScore == 2)
+        let week = MatchweekFeature.State(career: decoded)
+        #expect(week.playedWeeks.first?.first?.homeScore == 2)
+        #expect(week.skillChoice == nil)
+        #expect(week.injuryNotice == nil)
+        #expect(week.shownWeekIndex == 4)
 
         var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         object.removeValue(forKey: "playedWeeks")
-        let stripped = try JSONSerialization.data(withJSONObject: object)
-        let older = try JSONDecoder().decode(Career.self, from: stripped)
-        #expect(older.playedWeeks == nil)
-        #expect(older.weekIndex == 4)
-        #expect(older.userClubID == "everton")
-        let week = MatchweekFeature.State(career: older)
-        #expect(week.playedWeeks.isEmpty)
-        #expect(week.browsedWeekIndex == nil)
-        #expect(week.shownWeekIndex == 4)
-        #expect(week.weekNumber == 5)
-    }
+        let missingWeeks = try JSONSerialization.data(withJSONObject: object)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Career.self, from: missingWeeks)
+        }
 
-    @Test func aCareerSavedBeforeInjuryNoticesStillLoads() throws {
-        let season = LeagueDraft.makeLeague(seed: 1)
-        let career = Career(matchweek: MatchweekFeature.State(userClubID: season.clubs[0].id, season: season))
-        let data = try JSONEncoder().encode(career)
-        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         object.removeValue(forKey: "injuryNotices")
         object.removeValue(forKey: "returnNotices")
-        let stripped = try JSONSerialization.data(withJSONObject: object)
-        let loaded = try JSONDecoder().decode(Career.self, from: stripped)
-        #expect(loaded.injuryNotices.isEmpty)
-        #expect(loaded.returnNotices.isEmpty)
-        #expect(loaded.userClubID == career.userClubID)
-        #expect(loaded.clubs.count == career.clubs.count)
+        let missingNotices = try JSONSerialization.data(withJSONObject: object)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Career.self, from: missingNotices)
+        }
     }
 
-    @Test func aSavedPlayerWithoutTheNewFieldsStillLoads() throws {
+    @Test func aPlayerMissingCurrentFieldsDoesNotDecode() throws {
         let json = """
         {"id":"p","firstName":"Bo","lastName":"Queef","position":"forward","condition":90,"isStarter":true,"ratings":{"speed":70,"shooting":70,"passing":70,"dribbling":70,"defending":70,"goalkeeping":70},"xp":4,"skillsEarned":1,"injury":{"label":"dead leg","weeksLeft":2}}
         """
-        let player = try JSONDecoder().decode(Player.self, from: Data(json.utf8))
-        #expect(player.fitnessDebt == 0)
-        #expect(player.injury?.cause == "")
-        #expect(player.injury?.label == "dead leg")
-        #expect(player.xp == 4)
-        #expect(player.level == 1)
-        #expect(player.skillsEarned == 1)
-        #expect(player.age == WeekTuning.missingAge)
-        #expect(player.growth == .med)
-        #expect(player.potential == .open)
-        let projection = SkillProjection.make(
-            current: player.ratings.shooting,
-            boost: 5,
-            ceiling: player.potential.shooting
-        )
-        #expect(projection.next == 75)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Player.self, from: Data(json.utf8))
+        }
+    }
+
+    @Test func continueDropsACareerTheCurrentModelCannotRead() async throws {
+        let season = LeagueDraft.makeLeague(seed: 2)
+        let career = Career(matchweek: MatchweekFeature.State(userClubID: season.clubs[0].id, season: season))
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(career)) as? [String: Any])
+        var clubs = try #require(object["clubs"] as? [[String: Any]])
+        var players = try #require(clubs[0]["players"] as? [[String: Any]])
+        players[0].removeValue(forKey: "potential")
+        clubs[0]["players"] = players
+        object["clubs"] = clubs
+        let data = try JSONSerialization.data(withJSONObject: object)
+
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ss2-career-\(UUID().uuidString)", isDirectory: true)
+        let url = folder.appendingPathComponent(CareerLocation.fileName)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try data.write(to: url)
+
+        let file = CareerStore.file(at: url)
+        #expect(await file.load() == nil)
+        #expect(FileManager.default.fileExists(atPath: url.path) == false)
+
+        try data.write(to: url)
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        } withDependencies: {
+            $0.careerStore = .file(at: url)
+        }
+        store.exhaustivity = .off
+
+        await store.send(.frontDoor(.view(.onAppear)))
+        await store.skipReceivedActions()
+        #expect(store.state.frontDoor.canContinue == false)
+        #expect(store.state.frontDoor.failedToOpen == false)
+        #expect(store.state.game == nil)
+        #expect(FileManager.default.fileExists(atPath: url.path) == false)
+        await store.send(.frontDoor(.view(.continueButtonTapped)))
+        #expect(store.state.game == nil)
     }
 }
 

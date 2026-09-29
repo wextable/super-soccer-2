@@ -18,6 +18,6 @@ struct Career: Codable, Equatable, Sendable {
     var injuryNotices: [InjuryNotice] = []
     /// Players who are fit again. Read after the week has advanced.
     var returnNotices: [ReturnNotice] = []
-    /// Scorelines for weeks already on the table, in week order. Careers saved before paging omit this.
-    var playedWeeks: [[Matchweek.Scoreline]]?
+    /// Scorelines for weeks already on the table, in week order.
+    var playedWeeks: [[Matchweek.Scoreline]]
 }

@@ -23,9 +23,15 @@ private actor CareerDisk {
     }
 
     func load() -> Career? {
-        guard let url = try? fileURL(), FileManager.default.fileExists(atPath: url.path) else { return nil }
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(Career.self, from: data)
+        switch read() {
+        case let .career(career):
+            return career
+        case let .incompatible(url):
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        case .missing, .unreadable:
+            return nil
+        }
     }
 
     func save(_ career: Career) {
@@ -40,8 +46,36 @@ private actor CareerDisk {
     }
 
     func exists() -> Bool {
-        guard let url = try? fileURL() else { return false }
-        return FileManager.default.fileExists(atPath: url.path)
+        switch read() {
+        case .career:
+            return true
+        case let .incompatible(url):
+            try? FileManager.default.removeItem(at: url)
+            return false
+        case .missing, .unreadable:
+            return false
+        }
+    }
+
+    /// A file that is not the current career is deleted. Continue then has nothing to open.
+    private func read() -> Read {
+        guard let url = try? fileURL() else { return .unreadable }
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        guard let data = try? Data(contentsOf: url) else { return .unreadable }
+        do {
+            return .career(try JSONDecoder().decode(Career.self, from: data))
+        } catch is DecodingError {
+            return .incompatible(url)
+        } catch {
+            return .unreadable
+        }
+    }
+
+    private enum Read {
+        case missing
+        case unreadable
+        case career(Career)
+        case incompatible(URL)
     }
 
     private func fileURL() throws -> URL {

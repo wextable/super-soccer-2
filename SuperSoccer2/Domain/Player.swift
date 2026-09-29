@@ -155,7 +155,7 @@ struct Potential: Codable, Equatable, Sendable {
         max(speed, max(shooting, max(passing, max(dribbling, max(defending, goalkeeping)))))
     }
 
-    /// A career saved before ceilings. Every stat could still reach the old cap.
+    /// Every attribute can reach 99.
     static let open = Potential(
         speed: 99,
         shooting: 99,
@@ -246,82 +246,3 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-extension Player.Injury {
-    private enum CodingKeys: String, CodingKey {
-        case label
-        case weeksLeft
-        case cause
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        label = try container.decode(String.self, forKey: .label)
-        weeksLeft = try container.decode(Int.self, forKey: .weeksLeft)
-        cause = try container.decodeIfPresent(String.self, forKey: .cause) ?? ""
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(label, forKey: .label)
-        try container.encode(weeksLeft, forKey: .weeksLeft)
-        try container.encode(cause, forKey: .cause)
-    }
-}
-
-extension Player {
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case firstName
-        case lastName
-        case position
-        case condition
-        case isStarter
-        case ratings
-        case age
-        case potential
-        case growth
-        case xp
-        case level
-        case skillsEarned
-        case injury
-        case fitnessDebt
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        firstName = try container.decode(String.self, forKey: .firstName)
-        lastName = try container.decode(String.self, forKey: .lastName)
-        position = try container.decode(Position.self, forKey: .position)
-        condition = try container.decode(Int.self, forKey: .condition)
-        isStarter = try container.decodeIfPresent(Bool.self, forKey: .isStarter) ?? false
-        ratings = try container.decode(Ratings.self, forKey: .ratings)
-        age = try container.decodeIfPresent(Int.self, forKey: .age) ?? WeekTuning.missingAge
-        potential = try container.decodeIfPresent(Potential.self, forKey: .potential) ?? .open
-        growth = try container.decodeIfPresent(Growth.self, forKey: .growth) ?? .med
-        xp = try container.decodeIfPresent(Int.self, forKey: .xp) ?? 0
-        skillsEarned = try container.decodeIfPresent(Int.self, forKey: .skillsEarned) ?? 0
-        level = try container.decodeIfPresent(Int.self, forKey: .level) ?? skillsEarned
-        injury = try container.decodeIfPresent(Injury.self, forKey: .injury)
-        fitnessDebt = try container.decodeIfPresent(Int.self, forKey: .fitnessDebt) ?? 0
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(firstName, forKey: .firstName)
-        try container.encode(lastName, forKey: .lastName)
-        try container.encode(position, forKey: .position)
-        try container.encode(condition, forKey: .condition)
-        try container.encode(isStarter, forKey: .isStarter)
-        try container.encode(ratings, forKey: .ratings)
-        try container.encode(age, forKey: .age)
-        try container.encode(potential, forKey: .potential)
-        try container.encode(growth, forKey: .growth)
-        try container.encode(xp, forKey: .xp)
-        try container.encode(level, forKey: .level)
-        try container.encode(skillsEarned, forKey: .skillsEarned)
-        try container.encodeIfPresent(injury, forKey: .injury)
-        try container.encode(fitnessDebt, forKey: .fitnessDebt)
-    }
-}
