@@ -54,8 +54,8 @@ struct ThemeTests {
         #expect(Theme.starbyte.metrics.tickerRadius == 0)
         #expect(Theme.starbyte.metrics.pitchRadius == 0)
         #expect(Theme.starbyte.metrics.minimumControl == 44)
-        #expect(PixelFont.regular == "Silkscreen-Regular")
-        #expect(PixelFont.bold == "Silkscreen-Bold")
+        #expect(PixelFont.regular == "Jersey15-Regular")
+        #expect(PixelFont.family == "Jersey 15")
         expectPositionInks(colors)
     }
 
