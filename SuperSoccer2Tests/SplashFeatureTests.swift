@@ -42,12 +42,12 @@ struct SplashFeatureTests {
         }
     }
 
-    @Test func theLaunchPictureMatchesTheStarbyteField() {
+    @Test func theLaunchPictureSitsOnThePitchGreen() {
         let named = UIColor(named: "LaunchGround")
         #expect(named != nil)
-        let ground = Theme.starbyte.colors.background
-        expect(named, matches: ground.light, style: .light)
-        expect(named, matches: ground.dark, style: .dark)
+        let pitch = RGB.byte(76, 131, 62)
+        expect(named, matches: pitch, style: .light)
+        expect(named, matches: pitch, style: .dark)
 
         let image = UIImage(named: "LaunchSplash")
         #expect(image != nil)
