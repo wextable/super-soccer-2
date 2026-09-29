@@ -30,12 +30,7 @@ struct InjuryNoticeView: View {
             Text("Uh oh")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.fitnessRed.color)
-            if store.stepCount > 1 {
-                Text("\(store.step) of \(store.stepCount)")
-                    .font(theme.type.eyebrow)
-                    .foregroundStyle(theme.colors.secondaryText.color)
-                    .contentTransition(.numericText())
-            }
+            StepCountRule(step: store.step, stepCount: store.stepCount)
             Text(store.notice.positionTitle)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.color(labeled: store.notice.positionTitle))

@@ -11,35 +11,55 @@ struct SkillChoiceView: View {
             VStack(alignment: .leading, spacing: theme.space.lg) {
                 header
                 choices
+                if store.phase == .grown {
+                    Button("Continue") {
+                        store.send(.view(.continueTapped))
+                    }
+                    .buttonStyle(ThemeActionButtonStyle())
+                    .accessibilityHint("Goes on to the next level up, or to the rest of the week")
+                }
             }
             .padding(theme.space.lg)
             .readingWidth()
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: store.phase == .grown)
         }
         .themeScreen()
         .interactiveDismissDisabled()
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.offerID)
+        .sensoryFeedback(.selection, trigger: store.selectedStat)
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
+            Text("Level up")
+                .font(theme.type.display)
+                .foregroundStyle(theme.colors.title.color)
+            Text(store.reason)
+                .font(theme.type.tagline)
+                .foregroundStyle(theme.colors.text.color)
+                .fixedSize(horizontal: false, vertical: true)
             Text(store.contextLine)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.secondaryText.color)
-            if store.stepCount > 1 {
-                Text("\(store.step) of \(store.stepCount)")
-                    .font(theme.type.eyebrow)
-                    .foregroundStyle(theme.colors.secondaryText.color)
-                    .contentTransition(.numericText())
-            }
+            StepCountRule(step: store.step, stepCount: store.stepCount)
             Text(store.player.position.title)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.color(for: store.player.position))
-            Text(store.player.fullName)
-                .font(theme.type.display)
-                .foregroundStyle(theme.colors.title.color)
-                .lineLimit(2)
-                .minimumScaleFactor(0.5)
-            Text("Pick one stat")
+            HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
+                Text(store.player.fullName)
+                    .font(theme.type.display)
+                    .foregroundStyle(theme.colors.title.color)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.5)
+                Spacer(minLength: theme.space.sm)
+                Text("\(store.displayedOverall)")
+                    .font(theme.type.score)
+                    .foregroundStyle(theme.colors.text.color)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.displayedOverall)
+                    .accessibilityLabel("Overall \(store.displayedOverall)")
+            }
+            Text(store.instruction)
                 .font(theme.type.tagline)
                 .foregroundStyle(theme.colors.secondaryText.color)
         }
@@ -61,31 +81,75 @@ struct SkillChoiceView: View {
             boost: choice.points,
             ceiling: store.player.potential.value(for: choice.stat)
         )
+        let isSelected = store.selectedStat == choice.stat && store.phase != .choosing
+        let settled = isSelected && (store.phase == .growing || store.phase == .grown)
+        let reading = settled && store.phase == .grown ? "\(projection.next)" : projection.reading
         return VStack(spacing: 0) {
             Button {
-                store.send(.view(.statTapped(choice.stat)))
+                store.send(.view(.statTapped(choice.stat, reduceMotion: reduceMotion)))
             } label: {
                 HStack(spacing: theme.space.sm) {
                     RatingLabel(text: choice.stat.label)
-                    RatingBar(track: .growth(projection), mark: .growth)
-                    GrowthReading(reading: projection.reading)
+                    RatingBar(
+                        track: displayTrack(projection, settled: settled),
+                        mark: .growth,
+                        pulsesMark: store.phase == .choosing && projection.next > projection.current
+                    )
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: SkillChoiceFeature.growSeconds),
+                        value: settled
+                    )
+                    GrowthReading(reading: reading)
                 }
                 .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl, alignment: .leading)
+                .padding(.horizontal, theme.space.xs)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: theme.metrics.pixelChrome ? 0 : 6, style: .continuous)
+                            .fill(theme.colors.score.color.opacity(0.24))
+                    }
+                }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: isSelected)
             }
             .buttonStyle(.plain)
-            .disabled(!projection.available)
-            .opacity(projection.available ? 1 : 0.4)
+            .disabled(store.phase != .choosing || !projection.available)
+            .opacity(rowOpacity(available: projection.available, selected: isSelected))
             .accessibilityLabel(choiceLabel(choice.stat, projection))
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
             if !isLast {
                 WeekHairline()
             }
         }
     }
 
+    private func displayTrack(_ projection: SkillProjection, settled: Bool) -> RatingTrack {
+        guard settled else { return .growth(projection) }
+        return .growth(
+            SkillProjection(
+                current: projection.next,
+                next: projection.next,
+                ceiling: projection.ceiling,
+                available: false
+            )
+        )
+    }
+
+    private func rowOpacity(available: Bool, selected: Bool) -> Double {
+        if selected || (available && store.phase == .choosing) { return 1 }
+        return 0.4
+    }
+
     private func choiceLabel(_ stat: PlayerStat, _ projection: SkillProjection) -> String {
-        if projection.available {
-            return "\(stat.label), \(projection.current) to \(projection.next), for \(store.player.fullName)"
+        let name = store.player.fullName
+        if store.selectedStat == stat, store.phase == .grown {
+            return "\(stat.label), \(projection.next), for \(name)"
         }
-        return "\(stat.label), \(projection.current), cannot increase, for \(store.player.fullName)"
+        if store.selectedStat == stat, store.phase != .choosing {
+            return "\(stat.label), selected, \(projection.current) to \(projection.next), for \(name)"
+        }
+        if projection.available {
+            return "\(stat.label), \(projection.current) to \(projection.next), for \(name)"
+        }
+        return "\(stat.label), \(projection.current), cannot increase, for \(name)"
     }
 }
