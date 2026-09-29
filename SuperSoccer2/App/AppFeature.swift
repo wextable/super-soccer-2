@@ -5,6 +5,7 @@ import Foundation
 struct AppFeature {
     @ObservableState
     struct State: Equatable {
+        var splash = SplashFeature.State()
         var frontDoor = FrontDoorFeature.State()
         /// The tab bar. It stays nil until a career is open, and then it is the root.
         var game: MatchweekFeature.State?
@@ -15,6 +16,7 @@ struct AppFeature {
     }
 
     enum Action {
+        case splash(SplashFeature.Action)
         case frontDoor(FrontDoorFeature.Action)
         case game(MatchweekFeature.Action)
         case menu(PresentationAction<FrontDoorFeature.Action>)
@@ -24,11 +26,17 @@ struct AppFeature {
     @Dependency(\.careerStore) var careerStore
 
     var body: some ReducerOf<Self> {
+        Scope(state: \.splash, action: \.splash) {
+            SplashFeature()
+        }
         Scope(state: \.frontDoor, action: \.frontDoor) {
             FrontDoorFeature()
         }
         Reduce<State, Action> { state, action in
             switch action {
+            case .splash:
+                return .none
+
             case .frontDoor(.delegate(.newGame)):
                 guard state.game == nil, state.selection == nil else { return .none }
                 state.selection = ClubSelectionFeature.State()

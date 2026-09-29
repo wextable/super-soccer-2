@@ -171,12 +171,16 @@ struct WeekTab: View {
             VStack(spacing: theme.space.xxs) {
                 Text("Week \(store.browsedWeekNumber)")
                     .font(theme.type.display)
-                    .foregroundStyle(theme.colors.text.color)
+                    .foregroundStyle(theme.colors.title.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(store.browsedWeekHasResults ? "Results" : "Fixtures")
                     .font(theme.type.eyebrow)
                     .foregroundStyle(theme.colors.secondaryText.color)
+                if theme.metrics.pixelChrome {
+                    PixelRule()
+                        .frame(width: 96)
+                }
                 if !store.browsingTheCurrentWeek {
                     Text("The season is on week \(store.weekNumber).")
                         .font(theme.type.captionNumber)
@@ -349,7 +353,9 @@ struct MatchTab: View {
                 }
                 Text(store.userClub?.name ?? "Your club")
                     .font(theme.type.display)
-                    .foregroundStyle(theme.colors.text.color)
+                    .foregroundStyle(theme.colors.title.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let opponent = store.opponent {
@@ -369,6 +375,7 @@ struct MatchTab: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     private func playedScore(homeShort: String, awayShort: String, homeScore: Int, awayScore: Int) -> some View {
@@ -407,7 +414,9 @@ struct MatchTab: View {
                     ClubCrest(clubID: opponent.id, scale: .mark)
                     Text(opponent.name)
                         .font(theme.type.opponentName)
-                        .foregroundStyle(theme.colors.text.color)
+                        .foregroundStyle(theme.colors.title.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                 }
                 Text("Overall \(opponent.overall)")
                     .font(theme.type.overall)
@@ -431,22 +440,19 @@ struct MatchTab: View {
 
     private var keyPlayers: some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text("Key players")
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
+            SectionLabel(text: "Key players")
             WeekCard {
                 ForEach(store.keyPlayers) { player in
                     Button {
                         store.send(.view(.playerTapped(player.id)))
                     } label: {
                         HStack(spacing: theme.space.sm) {
-                            Text(player.position.label)
-                                .font(theme.type.captionNumber)
-                                .foregroundStyle(theme.colors.secondaryText.color)
-                                .frame(width: theme.metrics.minimumControl, alignment: .leading)
+                            PositionMark(position: player.position)
                             Text(player.fullName)
                                 .font(theme.type.playerName)
                                 .foregroundStyle(theme.colors.text.color)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             StarterRating(player: player)
                         }

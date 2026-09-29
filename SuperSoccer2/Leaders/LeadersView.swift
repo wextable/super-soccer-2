@@ -14,8 +14,11 @@ struct LeadersView: View {
                         .foregroundStyle(theme.colors.action.color)
                     Text("Leaders")
                         .font(theme.type.display)
-                        .foregroundStyle(theme.colors.text.color)
+                        .foregroundStyle(theme.colors.title.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
+                .pixelHeader()
                 if store.isEmpty {
                     ContentUnavailableView(
                         "No matches yet",
@@ -56,9 +59,7 @@ struct LeadersView: View {
         expand: @escaping () -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
-            Text(title)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
+            SectionLabel(text: title)
             if rows.isEmpty {
                 Text("None yet")
                     .font(theme.type.body)
@@ -100,11 +101,15 @@ struct LeadersView: View {
                     Text(row.player.fullName)
                         .font(theme.type.playerName)
                         .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.text.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     HStack(spacing: theme.space.xs) {
                         ClubCrest(clubID: row.clubID)
                         Text(isYours(row) ? "Your club · \(row.clubName)" : row.clubName)
                             .font(theme.type.captionNumber)
                             .foregroundStyle(isYours(row) ? theme.colors.action.color : theme.colors.secondaryText.color)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -33,15 +33,18 @@ struct SkillChoiceView: View {
             }
             Text(store.player.position.title)
                 .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.action.color)
+                .foregroundStyle(theme.colors.color(for: store.player.position))
             Text(store.player.fullName)
                 .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+                .foregroundStyle(theme.colors.title.color)
+                .lineLimit(2)
+                .minimumScaleFactor(0.5)
             Text("Pick one stat")
                 .font(theme.type.tagline)
                 .foregroundStyle(theme.colors.secondaryText.color)
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     private var choices: some View {

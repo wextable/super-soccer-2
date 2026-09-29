@@ -43,12 +43,15 @@ struct FrontDoorView: View {
                 .foregroundStyle(theme.colors.action.color)
             Text("The season")
                 .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+                .foregroundStyle(theme.colors.title.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
             Text(tagline)
                 .font(theme.type.tagline)
                 .foregroundStyle(store.failedToOpen ? theme.colors.danger.color : theme.colors.secondaryText.color)
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     @ViewBuilder
@@ -120,13 +123,18 @@ private struct QuietDoorButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(theme.type.button)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumControl)
             .foregroundStyle(theme.colors.action.color)
             .background(theme.colors.card.color)
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.buttonRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: theme.metrics.buttonRadius, style: .continuous)
-                    .strokeBorder(theme.colors.hairline.color, lineWidth: theme.metrics.hairline)
+                    .strokeBorder(
+                        theme.metrics.pixelChrome ? theme.colors.title.color : theme.colors.hairline.color,
+                        lineWidth: theme.metrics.pixelChrome ? 2 : theme.metrics.hairline
+                    )
             }
             .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
             .opacity(configuration.isPressed ? 0.82 : 1)

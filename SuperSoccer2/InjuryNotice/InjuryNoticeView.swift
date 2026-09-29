@@ -38,12 +38,15 @@ struct InjuryNoticeView: View {
             }
             Text(store.notice.positionTitle)
                 .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.action.color)
+                .foregroundStyle(theme.colors.color(labeled: store.notice.positionTitle))
             Text(store.notice.playerName)
                 .font(theme.type.display)
-                .foregroundStyle(theme.colors.text.color)
+                .foregroundStyle(theme.colors.title.color)
+                .lineLimit(2)
+                .minimumScaleFactor(0.5)
         }
         .accessibilityElement(children: .combine)
+        .pixelHeader()
     }
 
     private var story: some View {

@@ -23,6 +23,14 @@ enum Position: String, Codable, Equatable, Sendable, CaseIterable {
         case .forward: "Forward"
         }
     }
+
+    init?(labeled name: String) {
+        if let match = Self.allCases.first(where: { $0.title == name || $0.label == name }) {
+            self = match
+        } else {
+            return nil
+        }
+    }
 }
 
 struct Ratings: Codable, Equatable, Sendable {
