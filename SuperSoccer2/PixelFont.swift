@@ -2,25 +2,22 @@ import CoreText
 import Foundation
 import SwiftUI
 
-/// Silkscreen, an OFL bitmap face in the 8-pixel game tradition. The license is `Fonts/OFL.txt`.
+/// Jersey 15, an OFL retro face with open counters. The license is `Fonts/OFL.txt`.
 enum PixelFont {
-    static let family = "Silkscreen"
-    static let regular = "Silkscreen-Regular"
-    static let bold = "Silkscreen-Bold"
+    static let family = "Jersey 15"
+    static let regular = "Jersey15-Regular"
 
     static func register() {
-        for name in [regular, bold] {
-            let urls = [
-                Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts"),
-                Bundle.main.url(forResource: name, withExtension: "ttf")
-            ]
-            for url in urls.compactMap(\.self) {
-                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-            }
+        let urls = [
+            Bundle.main.url(forResource: regular, withExtension: "ttf", subdirectory: "Fonts"),
+            Bundle.main.url(forResource: regular, withExtension: "ttf")
+        ]
+        for url in urls.compactMap(\.self) {
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
     }
 
-    static func font(_ size: CGFloat, relativeTo style: Font.TextStyle, bold: Bool = false) -> Font {
-        .custom(bold ? Self.bold : Self.regular, size: size, relativeTo: style)
+    static func font(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
+        .custom(regular, size: size, relativeTo: style)
     }
 }

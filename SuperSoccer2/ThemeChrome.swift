@@ -6,8 +6,8 @@ extension Theme {
     @MainActor
     func installNavigationChrome() {
         guard metrics.pixelChrome else { return }
-        let titleFont = UIFont(name: PixelFont.regular, size: 16) ?? .preferredFont(forTextStyle: .headline)
-        let tabFont = UIFont(name: PixelFont.regular, size: 10) ?? titleFont
+        let titleFont = UIFont(name: PixelFont.regular, size: 20) ?? .preferredFont(forTextStyle: .headline)
+        let tabFont = UIFont(name: PixelFont.regular, size: 15) ?? titleFont
         let nav = UINavigationBarAppearance()
         nav.configureWithOpaqueBackground()
         nav.backgroundColor = colors.background.uiColor

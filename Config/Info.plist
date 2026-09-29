@@ -4,8 +4,16 @@
 <dict>
 	<key>UIAppFonts</key>
 	<array>
-		<string>Silkscreen-Regular.ttf</string>
-		<string>Silkscreen-Bold.ttf</string>
+		<string>Jersey15-Regular.ttf</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchGround</string>
+		<key>UIImageName</key>
+		<string>LaunchSplash</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<false/>
+	</dict>
 </dict>
 </plist>
