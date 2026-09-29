@@ -299,13 +299,16 @@ struct StepCountRule: View {
     @Environment(\.theme) private var theme
     var step: Int
     var stepCount: Int
+    var centered: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.space.xs) {
+        VStack(alignment: centered ? .center : .leading, spacing: theme.space.xs) {
             if stepCount > 1 {
                 Text("\(step) of \(stepCount)")
                     .font(theme.type.eyebrow)
                     .foregroundStyle(theme.colors.secondaryText.color)
+                    .multilineTextAlignment(centered ? .center : .leading)
+                    .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
                     .contentTransition(.numericText())
             }
             WeekHairline()

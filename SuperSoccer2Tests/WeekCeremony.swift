@@ -1,14 +1,11 @@
 import ComposableArchitecture
 @testable import SuperSoccer2
 
-/// The growth effect sends two actions. One skip can return while the bar is still growing.
+/// The growth effect sends two actions. Waiting for the last one finishes the bar.
 @MainActor
 func settleSkillChoice(_ store: TestStoreOf<MatchweekFeature>) async {
-    store.dependencies.continuousClock = ImmediateClock()
-    for _ in 0..<8 {
-        guard let choice = store.state.skillChoice, choice.phase != .grown else { return }
-        await store.skipReceivedActions()
-    }
+    guard store.state.skillChoice?.phase != .grown else { return }
+    await store.receive(\.skillChoice.presented.internal.grown)
 }
 
 /// Injuries and skill picks sit in front of the week moving on. Tests that only care about the next week walk through them.
@@ -35,7 +32,7 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<MatchweekFeature>) async {
                 await store.send(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false)))))
                 await store.skipReceivedActions()
             case .selected, .growing:
-                await store.skipReceivedActions()
+                await store.receive(\.skillChoice.presented.internal.grown)
             case .grown:
                 await store.send(.skillChoice(.presented(.view(.continueTapped))))
                 await store.skipReceivedActions()
@@ -68,7 +65,7 @@ func finishPresentedWeekSteps(_ store: TestStoreOf<AppFeature>) async {
                 await store.send(.game(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false))))))
                 await store.skipReceivedActions()
             case .selected, .growing:
-                await store.skipReceivedActions()
+                await store.receive(\.game.skillChoice.presented.internal.grown)
             case .grown:
                 await store.send(.game(.skillChoice(.presented(.view(.continueTapped)))))
                 await store.skipReceivedActions()

@@ -30,6 +30,12 @@ struct SkillChoiceView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
+            Text(store.contextLine)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+            StepCountRule(step: store.step, stepCount: store.stepCount, centered: true)
             Text("Level up")
                 .font(theme.type.display)
                 .foregroundStyle(theme.colors.title.color)
@@ -37,10 +43,6 @@ struct SkillChoiceView: View {
                 .font(theme.type.tagline)
                 .foregroundStyle(theme.colors.text.color)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(store.contextLine)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            StepCountRule(step: store.step, stepCount: store.stepCount)
             Text(store.player.position.title)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.color(for: store.player.position))
