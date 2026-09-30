@@ -397,6 +397,15 @@ enum WeekBetween {
             "dead leg",
             "bruised ribs",
             "twisted knee",
+            "swollen nuts",
+            "loose teeth",
+            "cleft anus",
+            "hyperextended groin",
+            "badly hurt feelings",
+            "nausea, gas, diarrhea, and blurred vision",
+            "case of cholera",
+            "torn ACL",
+            "lack of motivation to keep on living"
         ]
         let index = Int.random(in: 0..<labels.count, using: &rng)
         return labels[index]
@@ -417,6 +426,13 @@ enum WeekBetween {
             "stood on his foot.",
             "went through the back of him.",
             "clattered him and he stayed down.",
+            "made him fall down, go boom.",
+            "grabbed his nuts and twisted them.",
+            "decked him in the face and punched him in the eye, punched him in the belly and stepped on his feet, slammed the child on the hard concrete.",
+            "headbutted him right in the damn chest.",
+            "came right up to him and... BAM!",
+            "encouraged him to hurt himself"
+            
         ]
         let challenge = challenges[Int.random(in: 0..<challenges.count, using: &rng)]
         guard let opponent else {
