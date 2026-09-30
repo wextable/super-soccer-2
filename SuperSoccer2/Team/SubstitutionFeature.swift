@@ -8,7 +8,7 @@ struct SubstitutionFeature {
     struct State: Equatable {
         var kind: Kind
         var subject: Player
-        /// The obvious swap leads. Everyone else follows, in the order the week already ranked them.
+        /// Rest leads with the best teammate who can come in. Play lists starters lowest overall first.
         var candidates: [Player]
 
         enum Kind: Equatable, Sendable {
@@ -16,8 +16,13 @@ struct SubstitutionFeature {
             case play
         }
 
-        /// Rest and Play share this list. Nothing changes until one of these names is chosen.
-        var heading: String { "Replace with" }
+        /// Rest asks who comes in. Play asks who leaves, lowest overall first.
+        var heading: String {
+            switch kind {
+            case .rest: "Replace with"
+            case .play: "Replace"
+            }
+        }
 
         /// Sit this starter. The first name is the best teammate who can come in.
         static func resting(_ starter: Player, in players: [Player]) -> State? {
@@ -31,7 +36,7 @@ struct SubstitutionFeature {
             )
         }
 
-        /// Bring this bench player on. The first name is the starter they would sit.
+        /// Bring this bench player on. Names are the starters they can replace, lowest overall first.
         static func playing(_ bench: Player, in players: [Player]) -> State? {
             guard !bench.isStarter, bench.injury == nil,
                   let suggestion = WeekBetween.starterToSit(for: bench, in: players)

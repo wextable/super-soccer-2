@@ -223,6 +223,64 @@ struct WeekBetweenTests {
         #expect(otherBefore.subtracting(Set(otherAfter.starters.map(\.id))).count == 1)
     }
 
+    @Test func aFreshBenchedStarterReturnsWhileHisReplacementIsStillFresh() throws {
+        let tuning = WeekTuning.current
+        let star = forward(id: "star", shooting: 90, condition: tuning.greenMinimum, starter: false)
+        let cover = forward(id: "cover", shooting: 55, condition: 100, starter: true)
+        #expect(star.optimalOverall > cover.optimalOverall)
+        #expect(star.fitnessBand(tuning: tuning) == .green)
+        #expect(cover.fitnessBand(tuning: tuning) == .green)
+
+        let club = sampleClub(id: "city", players: [cover, star])
+        #expect(WeekBetween.restOneTired(club, tuning: tuning).starters.map(\.id) == ["cover"])
+        let restored = WeekBetween.restoreFresh(club, tuning: tuning)
+        #expect(restored.starters.map(\.id) == ["star"])
+        #expect(restored.bench.map(\.id) == ["cover"])
+
+        var waiting = star
+        waiting.condition = tuning.greenMinimum - 1
+        let stillTired = sampleClub(id: "city", players: [cover, waiting])
+        #expect(WeekBetween.restoreFresh(stillTired, tuning: tuning).starters.map(\.id) == ["cover"])
+
+        let lesser = forward(id: "lesser", shooting: 40, condition: 100, starter: false)
+        let starStarting = forward(id: "star", shooting: 90, condition: 100, starter: true)
+        let held = sampleClub(id: "city", players: [starStarting, lesser])
+        #expect(WeekBetween.restoreFresh(held, tuning: tuning).starters.map(\.id) == ["star"])
+    }
+
+    @Test func otherClubsRestoreAFreshStarterAndTheUserLineupStays() throws {
+        var tuning = WeekTuning.current
+        tuning.injuryChanceGreen = 0
+        tuning.injuryChanceYellow = 0
+        tuning.injuryChanceOrange = 0
+        tuning.injuryChanceRed = 0
+
+        let user = sampleClub(id: "user", players: [
+            forward(id: "user-cover", shooting: 55, condition: 100, starter: true),
+            forward(id: "user-star", shooting: 90, condition: tuning.greenMinimum, starter: false),
+        ])
+        let other = sampleClub(id: "other", players: [
+            forward(id: "cover", shooting: 55, condition: 100, starter: true),
+            forward(id: "star", shooting: 90, condition: tuning.greenMinimum, starter: false),
+        ])
+        let settlement = WeekBetween.settle(
+            clubs: [user, other],
+            scorelines: [Matchweek.Scoreline(homeID: "user", awayID: "other", homeScore: 1, awayScore: 0)],
+            tallies: [],
+            userClubID: "user",
+            seed: 4,
+            tuning: tuning
+        )
+        let userAfter = try #require(settlement.clubs.first { $0.id == "user" })
+        let otherAfter = try #require(settlement.clubs.first { $0.id == "other" })
+        #expect(userAfter.starters.map(\.id) == ["user-cover"])
+        #expect(userAfter.bench.map(\.id) == ["user-star"])
+        #expect(otherAfter.starters.map(\.id) == ["star"])
+        let coverAfter = try #require(otherAfter.players.first { $0.id == "cover" })
+        #expect(coverAfter.isStarter == false)
+        #expect(coverAfter.fitnessBand(tuning: tuning) == .green)
+    }
+
     @Test func tiredOrMissingPlayersChangeTheScore() {
         let pair = SquadCatalog.makePair(seed: 42)
         let city = pair[0]
@@ -551,8 +609,11 @@ struct WeekBetweenFeatureTests {
         let bench = try #require(club.bench.first { WeekBetween.starterToSit(for: $0, in: club.players) != nil })
         let sitting = try #require(WeekBetween.starterToSit(for: bench, in: club.players))
         await store.send(.view(.playBench(bench.id)))
-        #expect(store.state.substitution?.heading == "Replace with")
+        #expect(store.state.substitution?.heading == "Replace")
         #expect(store.state.substitution?.candidates.first?.id == sitting.id)
+        let playIDs = store.state.substitution?.candidates.map(\.id) ?? []
+        let playOveralls = playIDs.compactMap { id in club.players.first { $0.id == id }?.overall }
+        #expect(playOveralls == playOveralls.sorted())
         #expect(store.state.userClub?.starters.contains { $0.id == bench.id } == false)
 
         await store.send(.substitution(.presented(.view(.nameTapped(sitting.id)))))
@@ -928,6 +989,12 @@ private func sampleClub(id: String, players: [Player]) -> Club {
         ),
         players: players
     )
+}
+
+private func forward(id: String, shooting: Int, condition: Int, starter: Bool) -> Player {
+    var player = squadPlayer(id: id, position: .forward, condition: condition, starter: starter)
+    player.ratings.shooting = shooting
+    return player
 }
 
 private func squadPlayer(

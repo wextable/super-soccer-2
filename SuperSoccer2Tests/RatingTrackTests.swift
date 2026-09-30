@@ -349,8 +349,11 @@ struct LineupDialogTests {
         let cover = squad(id: "cover", position: .midfielder, starter: false, passing: 90)
         let other = squad(id: "other", position: .midfielder, starter: false, passing: 50)
         let strong = squad(id: "strong", position: .defender, starter: true, passing: 70, defending: 90)
+        let mid = squad(id: "mid", position: .defender, starter: true, passing: 70, defending: 65)
         let weak = squad(id: "weak", position: .defender, starter: true, passing: 70, defending: 40)
         let bench = squad(id: "bench", position: .defender, starter: false, passing: 70, defending: 70)
+        #expect(weak.overall < mid.overall)
+        #expect(mid.overall < strong.overall)
         let club = Club(
             id: "city",
             name: "City",
@@ -361,7 +364,7 @@ struct LineupDialogTests {
                 primary: KitColor(red: 0, green: 0, blue: 0),
                 secondary: KitColor(red: 1, green: 1, blue: 1)
             ),
-            players: [starter, cover, other, strong, weak, bench]
+            players: [starter, cover, other, strong, mid, weak, bench]
         )
         let store = TestStore(
             initialState: TeamFeature.State(
@@ -402,8 +405,8 @@ struct LineupDialogTests {
         #expect(store.state.club == club)
 
         let play = try #require(SubstitutionFeature.State.playing(bench, in: club.players))
-        #expect(play.heading == "Replace with")
-        #expect(play.candidates.map(\.id) == [weak.id, strong.id])
+        #expect(play.heading == "Replace")
+        #expect(play.candidates.map(\.id) == [weak.id, mid.id, strong.id])
 
         await store.send(.view(.playBench(bench.id)))
         #expect(store.state.substitution == play)

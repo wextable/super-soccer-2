@@ -142,7 +142,7 @@ struct TeamScreen: View {
 
     private func playerRow(_ player: Player) -> some View {
         let band = player.fitnessBand()
-        let mark = player.injury == nil ? band.label : "Out"
+        let mark = player.injury == nil ? "\(band.label) · \(player.condition)" : "Out"
         let showRest = onRest != nil
             && player.isStarter
             && player.injury == nil
@@ -170,6 +170,8 @@ struct TeamScreen: View {
                         Text(mark)
                             .font(theme.type.captionNumber)
                             .foregroundStyle(bandColor(player))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     StarterRating(player: player)

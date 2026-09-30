@@ -42,12 +42,12 @@ enum WeekBetween {
         worst(of: sittingCandidates(for: player, in: players))
     }
 
-    /// Other starters in that role, best overall first. The obvious player to sit is not in this list.
+    /// Other starters in that role, lowest overall first. The obvious player to sit is not in this list.
     static func otherStarters(for player: Player, in players: [Player]) -> [Player] {
         let sitID = starterToSit(for: player, in: players)?.id
         return sittingCandidates(for: player, in: players)
             .filter { $0.id != sitID }
-            .sorted(by: bestFirst)
+            .sorted(by: fitterFirst)
     }
 
     /// Sit a starter and bring in a teammate of the same role. An injured player cannot come in.
@@ -87,6 +87,40 @@ enum WeekBetween {
             if let updated = replace(starter.id, with: incoming.id, in: club) {
                 return updated
             }
+        }
+        return club
+    }
+
+    /// A benched player who is green again takes a weaker starter’s place in that role.
+    /// He does not wait until the player who replaced him drops out of green.
+    static func restoreFresh(_ club: Club, tuning: WeekTuning = .current) -> Club {
+        var club = club
+        let freshIDs = club.bench
+            .filter { $0.injury == nil && $0.fitnessBand(tuning: tuning) == .green }
+            .sorted { lhs, rhs in
+                if lhs.optimalOverall != rhs.optimalOverall { return lhs.optimalOverall > rhs.optimalOverall }
+                return lhs.id < rhs.id
+            }
+            .map(\.id)
+        for id in freshIDs {
+            guard
+                let bench = club.players.first(where: { $0.id == id }),
+                !bench.isStarter,
+                bench.injury == nil,
+                bench.fitnessBand(tuning: tuning) == .green
+            else { continue }
+            let outgoing = club.starters
+                .filter { starter in
+                    starter.position == bench.position
+                        && starter.injury == nil
+                        && starter.optimalOverall < bench.optimalOverall
+                }
+                .min { lhs, rhs in
+                    if lhs.optimalOverall != rhs.optimalOverall { return lhs.optimalOverall < rhs.optimalOverall }
+                    return lhs.id > rhs.id
+                }
+            guard let outgoing, let updated = replace(outgoing.id, with: bench.id, in: club) else { continue }
+            club = updated
         }
         return club
     }
@@ -135,6 +169,7 @@ enum WeekBetween {
             )
             if next[index].id != userClubID {
                 next[index] = restOneTired(next[index], tuning: tuning)
+                next[index] = restoreFresh(next[index], tuning: tuning)
             }
         }
         return Settlement(clubs: next, offers: offers)
