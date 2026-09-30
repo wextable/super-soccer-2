@@ -737,24 +737,95 @@ struct WeekBetweenFeatureTests {
 
     @Test func aSavedReturnOpensOnTheNewWeek() throws {
         let season = LeagueDraft.makeLeague(seed: 3)
-        var career = Career(matchweek: MatchweekFeature.State(userClubID: "everton", season: season))
+        var career = MatchweekFeature.State(userClubID: "everton", season: season).career
         career.weekIndex = 3
         career.committedWeeks = 4
         career.returnNotices = [
             ReturnNotice(id: "back", playerName: "Ada Keeper", positionTitle: "Keeper", ailment: "sprained ankle", weekIndex: 3)
         ]
         let waiting = MatchweekFeature.State(career: career)
+        #expect(waiting.career == career)
         #expect(waiting.weekIndex == 3)
         #expect(waiting.returnNotice == nil)
 
         career.weekIndex = 4
         let week = MatchweekFeature.State(career: career)
+        #expect(week.career == career)
         #expect(week.weekIndex == 4)
         #expect(week.returnNotice?.notice.headline == "Ada Keeper is back from a sprained ankle.")
         #expect(week.returnNotice?.step == 1)
         #expect(week.returnNotices.count == 1)
         #expect(week.skillChoice == nil)
         #expect(week.injuryNotice == nil)
+    }
+
+    @Test func aSkillUpdatesTheOpenTeamWithoutClosingIt() async throws {
+        let season = LeagueDraft.makeLeague(seed: 42)
+        var state = MatchweekFeature.State(userClubID: "manchester-city", season: season)
+        let stat = PlayerStat.passing
+        let points = WeekTuning.current.points(for: stat)
+        let club = try #require(state.userClub)
+        let player = try #require(club.starters.first {
+            $0.ratings.value(for: stat) + points <= $0.potential.value(for: stat)
+                && WeekBetween.bestFit(replacing: $0, in: club.players) != nil
+        })
+        state.committedWeeks = 1
+        state.standings = state.standings.map { row in
+            guard row.clubID == club.id else { return row }
+            return Standing(
+                clubID: row.clubID,
+                played: 4,
+                won: 3,
+                drawn: 1,
+                lost: 0,
+                points: 10,
+                goalsFor: 8,
+                goalsAgainst: 2
+            )
+        }
+        state.skillOffers = [
+            SkillOffer(id: "one", playerID: player.id, clubID: club.id),
+            SkillOffer(id: "two", playerID: player.id, clubID: club.id),
+        ]
+        var team = state.teamScreen(for: club)
+        team.won = 0
+        team.lost = 0
+        team.drawn = 0
+        team.points = 0
+        team.goalDifference = 0
+        team.place = nil
+        team.player = state.playerDetail(for: player, in: club)
+        team.substitution = SubstitutionFeature.State.resting(player, in: club.players)
+        state.team = team
+        let store = TestStore(initialState: state) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.nextFixtureButtonTapped))
+        #expect(store.state.skillChoice?.player.id == player.id)
+        #expect(store.state.team?.player?.player.id == player.id)
+        #expect(store.state.team?.substitution?.subject.id == player.id)
+
+        store.dependencies.continuousClock = ImmediateClock()
+        await store.send(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false)))))
+        await settleSkillChoice(store)
+        await store.send(.skillChoice(.presented(.view(.continueTapped))))
+        await store.skipReceivedActions()
+
+        let open = try #require(store.state.team)
+        #expect(store.state.weekIndex == 0)
+        #expect(store.state.skillChoice?.step == 2)
+        #expect(open.player?.player.id == player.id)
+        #expect(open.player?.player.ratings.value(for: stat) == player.ratings.value(for: stat) + points)
+        #expect(open.substitution?.subject.id == player.id)
+        #expect(open.club.players.first { $0.id == player.id }?.ratings.value(for: stat) == player.ratings.value(for: stat) + points)
+        #expect(open.won == 3)
+        #expect(open.lost == 0)
+        #expect(open.drawn == 1)
+        #expect(open.points == 10)
+        #expect(open.goalDifference == 6)
+        #expect(open.place == store.state.places[club.id])
     }
 
     @Test func theLastWeekReadsInjuriesBeforeTheChampionship() async throws {

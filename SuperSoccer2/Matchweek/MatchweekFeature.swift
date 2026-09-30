@@ -5,29 +5,12 @@ import Foundation
 struct MatchweekFeature {
     @ObservableState
     struct State: Equatable {
-        var userClubID: String
-        var clubs: [Club]
-        var weeks: [[LeagueDraft.Fixture]]
-        var weekIndex: Int
+        /// The season that gets saved. Clubs, the table, the week, offers, and notices live here.
+        var career: Career
         /// Week the Week screen is showing. Nil follows the season week, so the screen opens on the current week.
         var browsedWeekIndex: Int?
-        /// Scorelines for weeks already on the table, in week order.
-        var playedWeeks: [[Matchweek.Scoreline]]
-        var standings: [Standing]
-        var committedWeeks: Int
-        var pending: Matchweek.Played?
-        var totals: [String: LeagueLeaders.Counts]
-        var playerClub: [String: String]
-        /// Set when the last week is on the table. A later history screen reads this record.
-        var record: SeasonRecord?
         var didFail: Bool
         var tab: Tab
-        /// Skills the user has not spent yet. A week can add zero or several.
-        var skillOffers: [SkillOffer]
-        var skillChoices: [SkillChoice]
-        var injuryNotices: [InjuryNotice]
-        /// Returns still unread. These open the new week, after it has advanced.
-        var returnNotices: [ReturnNotice]
         var lineupRevision: Int
         var skillsChosen: Int
         /// Where to go once every open skill has a stat.
@@ -88,24 +71,26 @@ struct MatchweekFeature {
         }
 
         init(userClubID: String, season: LeagueDraft.Season) {
-            self.userClubID = userClubID
-            clubs = season.clubs
-            weeks = LeagueDraft.weeks(in: season.fixtures)
-            weekIndex = 0
+            career = Career(
+                userClubID: userClubID,
+                clubs: season.clubs,
+                weeks: LeagueDraft.weeks(in: season.fixtures),
+                weekIndex: 0,
+                standings: LeagueTable.zeros(clubIDs: season.clubs.map(\.id)),
+                committedWeeks: 0,
+                pending: nil,
+                totals: [:],
+                playerClub: [:],
+                record: nil,
+                skillOffers: [],
+                skillChoices: WeekTuning.current.skillChoices,
+                injuryNotices: [],
+                returnNotices: [],
+                playedWeeks: []
+            )
             browsedWeekIndex = nil
-            playedWeeks = []
-            standings = LeagueTable.zeros(clubIDs: season.clubs.map(\.id))
-            committedWeeks = 0
-            pending = nil
-            totals = [:]
-            playerClub = [:]
-            record = nil
             didFail = false
             tab = .club
-            skillOffers = []
-            skillChoices = WeekTuning.current.skillChoices
-            injuryNotices = []
-            returnNotices = []
             lineupRevision = 0
             skillsChosen = 0
             skillFollowUp = nil
@@ -123,9 +108,9 @@ struct MatchweekFeature {
         }
 
         init(career: Career) {
+            var career = career
             let seasonIsOver = career.committedWeeks > career.weekIndex
                 && career.weekIndex + 1 >= career.weeks.count
-            let returnNotices = seasonIsOver ? [] : career.returnNotices
             let queuedWeek = career.returnNotices.map(\.weekIndex).max()
             let returnNotice: ReturnNoticeFeature.State? = {
                 guard seasonIsOver == false,
@@ -139,25 +124,14 @@ struct MatchweekFeature {
                     stepCount: career.returnNotices.count
                 )
             }()
+            if seasonIsOver {
+                career.returnNotices = []
+            }
 
-            userClubID = career.userClubID
-            clubs = career.clubs
-            weeks = career.weeks
-            weekIndex = career.weekIndex
+            self.career = career
             browsedWeekIndex = nil
-            playedWeeks = career.playedWeeks
-            standings = career.standings
-            committedWeeks = career.committedWeeks
-            pending = career.pending
-            totals = career.totals
-            playerClub = career.playerClub
-            record = career.record
             didFail = false
             tab = .club
-            skillOffers = career.skillOffers
-            skillChoices = career.skillChoices
-            injuryNotices = career.injuryNotices
-            self.returnNotices = returnNotices
             lineupRevision = 0
             skillsChosen = 0
             skillFollowUp = nil
@@ -172,6 +146,85 @@ struct MatchweekFeature {
             player = nil
             substitution = nil
             seasonAlert = nil
+        }
+
+        var userClubID: String {
+            get { career.userClubID }
+            set { career.userClubID = newValue }
+        }
+
+        var clubs: [Club] {
+            get { career.clubs }
+            set { career.clubs = newValue }
+        }
+
+        var weeks: [[LeagueDraft.Fixture]] {
+            get { career.weeks }
+            set { career.weeks = newValue }
+        }
+
+        var weekIndex: Int {
+            get { career.weekIndex }
+            set { career.weekIndex = newValue }
+        }
+
+        /// Scorelines for weeks already on the table, in week order.
+        var playedWeeks: [[Matchweek.Scoreline]] {
+            get { career.playedWeeks }
+            set { career.playedWeeks = newValue }
+        }
+
+        var standings: [Standing] {
+            get { career.standings }
+            set { career.standings = newValue }
+        }
+
+        var committedWeeks: Int {
+            get { career.committedWeeks }
+            set { career.committedWeeks = newValue }
+        }
+
+        var pending: Matchweek.Played? {
+            get { career.pending }
+            set { career.pending = newValue }
+        }
+
+        var totals: [String: LeagueLeaders.Counts] {
+            get { career.totals }
+            set { career.totals = newValue }
+        }
+
+        var playerClub: [String: String] {
+            get { career.playerClub }
+            set { career.playerClub = newValue }
+        }
+
+        /// Set when the last week is on the table. A later history screen reads this record.
+        var record: SeasonRecord? {
+            get { career.record }
+            set { career.record = newValue }
+        }
+
+        /// Skills the user has not spent yet. A week can add zero or several.
+        var skillOffers: [SkillOffer] {
+            get { career.skillOffers }
+            set { career.skillOffers = newValue }
+        }
+
+        var skillChoices: [SkillChoice] {
+            get { career.skillChoices }
+            set { career.skillChoices = newValue }
+        }
+
+        var injuryNotices: [InjuryNotice] {
+            get { career.injuryNotices }
+            set { career.injuryNotices = newValue }
+        }
+
+        /// Returns still unread. These open the new week, after it has advanced.
+        var returnNotices: [ReturnNotice] {
+            get { career.returnNotices }
+            set { career.returnNotices = newValue }
         }
 
         var weekNumber: Int { weekIndex + 1 }
@@ -1076,7 +1129,7 @@ struct MatchweekFeature {
     }
 
     private func save(_ state: State) -> Effect<Action> {
-        let career = Career(matchweek: state)
+        let career = state.career
         return .run { [careerStore] _ in
             await careerStore.save(career)
         }

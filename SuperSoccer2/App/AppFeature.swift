@@ -104,7 +104,7 @@ struct AppFeature {
     }
 
     private func save(_ week: MatchweekFeature.State) -> Effect<Action> {
-        let career = Career(matchweek: week)
+        let career = week.career
         return .run { [careerStore] _ in
             await careerStore.save(career)
         }
