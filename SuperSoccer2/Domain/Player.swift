@@ -196,6 +196,8 @@ struct Player: Codable, Equatable, Sendable, Identifiable {
     var injury: Injury? = nil
     /// Thousandths of a condition point still to come off. Personal drain uses this.
     var fitnessDebt: Int = 0
+    /// Portrait parts from the old face factory. The screen paints them. The bitmap is not saved.
+    var face: PlayerFace = .plain
 
     var fullName: String {
         if firstName.isEmpty {
