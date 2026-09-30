@@ -102,20 +102,26 @@ struct TableTab: View {
             if let clubID, !isHeader {
                 ClubCrest(clubID: clubID)
             }
-            Text(club)
-                .font(isHeader ? theme.type.eyebrow : theme.type.playerName)
-                .foregroundStyle(rowColor(emphasized: emphasized, isHeader: isHeader))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(record)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(minWidth: theme.metrics.minimumControl + theme.space.lg, alignment: .trailing)
-            Text(points)
-                .frame(width: theme.metrics.minimumControl, alignment: .trailing)
-            Text(difference)
-                .frame(width: theme.metrics.minimumControl, alignment: .trailing)
+            HStack(alignment: .firstTextBaseline, spacing: theme.space.xxs) {
+                Text(club)
+                    .font(isHeader ? theme.type.eyebrow : theme.type.playerName)
+                    .foregroundStyle(rowColor(emphasized: emphasized, isHeader: isHeader))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(record)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(minWidth: theme.metrics.minimumControl, alignment: .trailing)
+                Text(points)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(width: theme.space.xl + theme.space.xs, alignment: .trailing)
+                Text(difference)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(width: theme.metrics.minimumControl, alignment: .trailing)
+            }
         }
         .font(isHeader ? theme.type.eyebrow : theme.type.captionNumber)
         .foregroundStyle(isHeader ? theme.colors.secondaryText.color : theme.colors.text.color)
@@ -347,24 +353,30 @@ struct MatchTab: View {
             Text("Week \(store.weekNumber)")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.action.color)
-            HStack(spacing: theme.space.sm) {
+            HStack(alignment: .center, spacing: theme.space.sm) {
                 if let club = store.userClub {
                     ClubCrest(clubID: club.id, scale: .mark)
                 }
-                Text(store.userClub?.name ?? "Your club")
-                    .font(theme.type.display)
-                    .foregroundStyle(theme.colors.title.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: theme.space.xxs) {
+                    Text(store.userClub?.name ?? "Your club")
+                        .font(theme.type.display)
+                        .foregroundStyle(theme.colors.title.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    placeLine(store.userMatchPlace)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let opponent = store.opponent {
-                HStack(spacing: theme.space.sm) {
+                HStack(alignment: .center, spacing: theme.space.sm) {
                     ClubCrest(clubID: opponent.id)
-                    Text(store.userIsHome ? "Home to \(opponent.name)" : "Away at \(opponent.name)")
-                        .font(theme.type.homeLine)
-                        .foregroundStyle(theme.colors.secondaryText.color)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: theme.space.xxs) {
+                        Text(store.userIsHome ? "Home to \(opponent.name)" : "Away at \(opponent.name)")
+                            .font(theme.type.homeLine)
+                            .foregroundStyle(theme.colors.secondaryText.color)
+                        placeLine(store.opponentMatchPlace)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if let homeShort = store.playedHomeShort,
@@ -418,6 +430,7 @@ struct MatchTab: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
+                placeLine(store.opponentMatchPlace)
                 Text("Overall \(opponent.overall)")
                     .font(theme.type.overall)
                     .foregroundStyle(theme.colors.text.color)
@@ -435,12 +448,32 @@ struct MatchTab: View {
         .clipShape(RoundedRectangle(cornerRadius: theme.metrics.cardRadius, style: .continuous))
         .shadow(color: theme.colors.shadow.color, radius: theme.metrics.shadowRadius, y: theme.metrics.shadowY)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(opponent.name), overall \(opponent.overall), attack \(opponent.attack), defense \(opponent.defense)")
+        .accessibilityLabel(opponentCardLabel(opponent))
+    }
+
+    @ViewBuilder
+    private func placeLine(_ place: Int?) -> some View {
+        if let place {
+            Text("\(LeagueTable.placeWord(place)) in table")
+                .font(theme.type.captionNumber)
+                .foregroundStyle(theme.colors.secondaryText.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    private func opponentCardLabel(_ opponent: Club) -> String {
+        var label = opponent.name
+        if let place = store.opponentMatchPlace {
+            label += ", \(LeagueTable.placeWord(place)) in table"
+        }
+        label += ", overall \(opponent.overall), attack \(opponent.attack), defense \(opponent.defense)"
+        return label
     }
 
     private var keyPlayers: some View {
         VStack(alignment: .leading, spacing: theme.space.sm) {
-            SectionLabel(text: "Key players")
+            SectionLabel(text: store.keyPlayersTitle)
             WeekCard {
                 ForEach(store.keyPlayers) { player in
                     Button {

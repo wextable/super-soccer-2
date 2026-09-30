@@ -298,8 +298,8 @@ struct LevelUpCopyTests {
     @Test func theOldLinesStayAndAnOfferKeepsItsSentence() {
         #expect(LevelUpCopy.lines.count == 20)
         #expect(LevelUpCopy.lines.contains("doesn't fuck around."))
-        #expect(LevelUpCopy.lines.contains("must have had sex this week."))
-        #expect(LevelUpCopy.lines.contains("totally got a blowjob in the parking lot."))
+        #expect(LevelUpCopy.lines.contains("ate a discarded fetus."))
+        #expect(LevelUpCopy.lines.contains("discovered his inner bastard child."))
         #expect(LevelUpCopy.lines.contains("FINALLY got those genital warts removed!"))
         #expect(LevelUpCopy.line(for: "offer") == "was practicing late at night all week long.")
         #expect(LevelUpCopy.line(for: "offer-1") == "might have some real potential.")

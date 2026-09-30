@@ -266,6 +266,26 @@ struct MatchweekFeature {
             return clubs.first { $0.id == opponentID }
         }
 
+        /// Match-screen heading, named for the opponent.
+        var keyPlayersTitle: String {
+            let name = opponent?.name ?? "Opponent"
+            return "\(name)'s key players"
+        }
+
+        /// League place on the match screen. Hidden until this club has played.
+        func leaguePlace(for clubID: String) -> Int? {
+            let played = standings.first { $0.clubID == clubID }?.played ?? 0
+            guard played > 0 else { return nil }
+            return places[clubID]
+        }
+
+        var userMatchPlace: Int? { leaguePlace(for: userClubID) }
+
+        var opponentMatchPlace: Int? {
+            guard let opponent else { return nil }
+            return leaguePlace(for: opponent.id)
+        }
+
         /// Highest overalls on the next opponent. A tie keeps roster order.
         var keyPlayers: [Player] {
             guard let opponent else { return [] }

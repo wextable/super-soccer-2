@@ -117,6 +117,7 @@ struct LeadersView: View {
                     .font(theme.type.playerOverall)
                     .foregroundStyle(theme.colors.text.color)
             }
+            .padding(.vertical, theme.space.xs)
             .frame(minHeight: theme.metrics.minimumControl)
         }
         .buttonStyle(.plain)
