@@ -65,13 +65,21 @@ struct SectionLabel: View {
     }
 }
 
-/// A broken cyan rule. The light look does not use it.
+/// A broken rule. Titles keep the cyan dash. Row separators use a thinner, quieter dash.
 struct PixelRule: View {
     @Environment(\.theme) private var theme
+    var role: Role = .accent
+
+    enum Role {
+        case accent
+        case separator
+    }
 
     var body: some View {
+        let height: CGFloat = role == .accent ? 4 : 2
+        let separator = role == .separator
         Canvas { context, size in
-            let color = theme.colors.title.color
+            let color = separator ? theme.colors.hairline.color : theme.colors.title.color
             let block: CGFloat = 6
             let gap: CGFloat = 3
             var x: CGFloat = 0
@@ -82,7 +90,7 @@ struct PixelRule: View {
                 x += block + gap
             }
         }
-        .frame(height: 4)
+        .frame(height: height)
         .accessibilityHidden(true)
     }
 }
@@ -285,7 +293,7 @@ struct WeekHairline: View {
 
     var body: some View {
         if theme.metrics.pixelChrome {
-            PixelRule()
+            PixelRule(role: .separator)
         } else {
             Rectangle()
                 .fill(theme.colors.hairline.color)

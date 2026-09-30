@@ -601,6 +601,11 @@ struct MatchweekFeatureTests {
         #expect(state.fixtureNames[city.id] == "\(cityPlace) Man City")
         #expect(state.fixtureNames[norwich.id] == "\(norwichPlace) Norwich")
         #expect(cityPlace == 1)
+        let opponent = try #require(state.opponent)
+        #expect(state.keyPlayersTitle == "\(opponent.name)'s key players")
+        #expect(state.leaguePlace(for: city.id) == nil)
+        #expect(state.leaguePlace(for: opponent.id) == nil)
+        #expect(state.leaguePlace(for: "missing") == nil)
     }
 
     @Test func theFinishedFixtureListStoresAChampionAndOpensTheChampionship() async throws {
@@ -879,6 +884,11 @@ struct MatchweekFeatureTests {
         #expect(team.place == store.state.places[club.id])
         #expect(team.points == standing.points)
         #expect(team.goalDifference == standing.goalDifference)
+        let opponent = try #require(store.state.opponent)
+        #expect(store.state.leaguePlace(for: club.id) == store.state.places[club.id])
+        #expect(store.state.leaguePlace(for: opponent.id) == store.state.places[opponent.id])
+        #expect(store.state.keyPlayersTitle == "\(opponent.name)'s key players")
+        #expect(store.state.weekNumber == 1)
     }
 }
 
