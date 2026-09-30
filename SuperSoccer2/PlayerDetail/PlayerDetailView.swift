@@ -68,40 +68,48 @@ struct PlayerDetailView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: theme.space.xs) {
-            Text(positionName)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.color(for: store.player.position))
-            Text(store.player.fullName)
-                .font(theme.type.display)
-                .foregroundStyle(theme.colors.title.color)
-                .lineLimit(2)
-                .minimumScaleFactor(0.5)
-            HStack(spacing: theme.space.sm) {
-                ClubCrest(clubID: store.clubID)
-                Text(store.clubName)
-                    .font(theme.type.tagline)
-                    .foregroundStyle(theme.colors.secondaryText.color)
-            }
-            Text("Age \(store.player.age)")
-                .font(theme.type.homeLine)
-                .foregroundStyle(theme.colors.secondaryText.color)
-            Text("Overall \(store.player.overall)")
-                .font(theme.type.overall)
-                .foregroundStyle(theme.colors.text.color)
-            if showsFitnessDrop {
-                Text("Full fitness \(store.player.optimalOverall)")
+        HStack(alignment: .top, spacing: theme.space.sm) {
+            PlayerFaceView(
+                face: store.player.face,
+                position: store.player.position,
+                clubID: store.clubID
+            )
+            VStack(alignment: .leading, spacing: theme.space.xs) {
+                Text(positionName)
+                    .font(theme.type.eyebrow)
+                    .foregroundStyle(theme.colors.color(for: store.player.position))
+                Text(store.player.fullName)
+                    .font(theme.type.display)
+                    .foregroundStyle(theme.colors.title.color)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.5)
+                HStack(spacing: theme.space.sm) {
+                    ClubCrest(clubID: store.clubID)
+                    Text(store.clubName)
+                        .font(theme.type.tagline)
+                        .foregroundStyle(theme.colors.secondaryText.color)
+                }
+                Text("Age \(store.player.age)")
                     .font(theme.type.homeLine)
                     .foregroundStyle(theme.colors.secondaryText.color)
-            }
-            Text(fitnessLine)
-                .font(theme.type.homeLine)
-                .foregroundStyle(fitnessColor)
-            if let cause = store.player.injury?.cause, cause.isEmpty == false {
-                Text(cause)
-                    .font(theme.type.tagline)
+                Text("Overall \(store.player.overall)")
+                    .font(theme.type.overall)
                     .foregroundStyle(theme.colors.text.color)
+                if showsFitnessDrop {
+                    Text("Full fitness \(store.player.optimalOverall)")
+                        .font(theme.type.homeLine)
+                        .foregroundStyle(theme.colors.secondaryText.color)
+                }
+                Text(fitnessLine)
+                    .font(theme.type.homeLine)
+                    .foregroundStyle(fitnessColor)
+                if let cause = store.player.injury?.cause, cause.isEmpty == false {
+                    Text(cause)
+                        .font(theme.type.tagline)
+                        .foregroundStyle(theme.colors.text.color)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
         .pixelHeader()

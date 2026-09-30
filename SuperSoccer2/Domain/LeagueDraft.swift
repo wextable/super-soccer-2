@@ -29,9 +29,13 @@ enum LeagueDraft {
         return templates[index].name
     }
 
+    static func kit(for clubID: String) -> Kit? {
+        templates.first { $0.id == clubID }?.kit
+    }
+
     static func makeLeague(seed: UInt64) -> Season {
         var generator = SeededGenerator(seed: seed)
-        var pool = makePool(using: &generator)
+        var pool = makePool(seed: seed, using: &generator)
         pool = assignDevelopment(pool, seed: seed)
         pool.sort { $0.overall > $1.overall }
 
@@ -106,15 +110,17 @@ enum LeagueDraft {
         }
     }
 
-    private static func makePool(using generator: inout SeededGenerator) -> [Player] {
+    /// Faces use their own generator. The rating draws, and the fixture shuffle after them, stay put.
+    private static func makePool(seed: UInt64, using generator: inout SeededGenerator) -> [Player] {
         var positions: [Position] = []
         positions += Array(repeating: .keeper, count: templates.count * maxKeepers)
         positions += Array(repeating: .defender, count: templates.count * maxPerOutfieldLine)
         positions += Array(repeating: .midfielder, count: templates.count * maxPerOutfieldLine)
         positions += Array(repeating: .forward, count: templates.count * maxPerOutfieldLine)
 
+        var faces = SeededGenerator(seed: seed &+ PlayerFaceGenerator.salt)
         return positions.enumerated().map { index, position in
-            Player(
+            var player = Player(
                 id: "pool-\(index)",
                 firstName: "",
                 lastName: "",
@@ -122,6 +128,8 @@ enum LeagueDraft {
                 condition: 100,
                 ratings: makeRatings(position: position, using: &generator)
             ).named(using: &generator)
+            player.face = PlayerFaceGenerator.make(using: &faces)
+            return player
         }
     }
 
