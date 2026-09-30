@@ -3,7 +3,7 @@ import Foundation
 
 @Reducer
 struct HighlightFeature {
-    /// Score on the board before the current shot is resolved.
+    /// How long a shot sits before the move starts.
     static let beatDuration: Duration = .milliseconds(800)
     /// How long the resolved shot stays up so the sentence can be read.
     static let lineDuration: Duration = .milliseconds(2400)
@@ -34,15 +34,49 @@ struct HighlightFeature {
         var sentenceVisible: Bool
         var reduceMotion: Bool
         var hasAppeared: Bool
+        var matchSeed: UInt64
+        var script: HighlightScript?
+        var attackingEnd: PitchEnd
+        /// Increments when the attacked goal changes, so the view can flip.
+        var cameraFlip: Int
+        /// Set once the half-time pause has been passed. The second half does not play the first again.
+        var halfTimePassed: Bool
 
         enum Phase: Equatable, Sendable {
             case incoming
             case shown
+            case halfTime
             case fullTime
         }
 
+        enum Move: Equatable, Sendable {
+            case shot
+            case halfTime
+            case fullTime
+            case waiting
+        }
+
         var minuteText: String {
-            phase == .fullTime ? "FT" : "\(minute)'"
+            switch phase {
+            case .fullTime:
+                "FT"
+            case .halfTime:
+                "HT"
+            case .incoming, .shown:
+                "\(minute)'"
+            }
+        }
+
+        var nextControlTitle: String {
+            guard phase == .shown else { return "Next shot" }
+            let upcoming = index + 1 < shots.count ? shots[index + 1] : nil
+            if !halfTimePassed, upcoming == nil || (upcoming?.minute ?? 0) > HighlightScript.halfMinute {
+                return "Half time"
+            }
+            if upcoming == nil {
+                return "Full time"
+            }
+            return "Next shot"
         }
 
         init(match: MatchResult, home: Club, away: Club) {
@@ -68,10 +102,17 @@ struct HighlightFeature {
             sentenceVisible = false
             reduceMotion = false
             hasAppeared = false
+            matchSeed = match.seed
+            script = nil
+            attackingEnd = .north
+            cameraFlip = 0
+            halfTimePassed = false
             homeScore = 0
             awayScore = 0
             if shots.isEmpty {
                 showFullTime()
+            } else if shots[0].minute > HighlightScript.halfMinute {
+                showHalfTime()
             } else {
                 showIncoming()
             }
@@ -89,13 +130,8 @@ struct HighlightFeature {
         }
 
         fileprivate mutating func showIncoming() {
-            let shot = shots[index]
+            present(shots[index])
             phase = .incoming
-            minute = shot.minute
-            commentary = line(for: shot)
-            showsPasser = shot.passer != nil
-            attackingIsHome = shot.isHome
-            result = shot.result
             let score = goals(endingAt: index)
             homeScore = score.home
             awayScore = score.away
@@ -104,13 +140,8 @@ struct HighlightFeature {
         }
 
         fileprivate mutating func revealCurrent() {
-            let shot = shots[index]
+            present(shots[index])
             phase = .shown
-            minute = shot.minute
-            commentary = line(for: shot)
-            showsPasser = shot.passer != nil
-            attackingIsHome = shot.isHome
-            result = shot.result
             let score = goals(endingAt: index + 1)
             homeScore = score.home
             awayScore = score.away
@@ -119,20 +150,47 @@ struct HighlightFeature {
         }
 
         /// Reduce motion skips the hold before a shot and lands on its result.
-        fileprivate mutating func showNextResult() {
+        fileprivate mutating func showNextResult() -> Move {
             switch phase {
             case .incoming:
                 revealCurrent()
+                return .shot
             case .shown:
-                if index + 1 < shots.count {
-                    index += 1
+                return moveOn(revealing: true)
+            case .halfTime, .fullTime:
+                return .waiting
+            }
+        }
+
+        fileprivate mutating func moveOn(revealing: Bool) -> Move {
+            if index + 1 < shots.count {
+                let upcoming = shots[index + 1]
+                if !halfTimePassed, upcoming.minute > HighlightScript.halfMinute {
+                    showHalfTime()
+                    return .halfTime
+                }
+                index += 1
+                if revealing {
                     revealCurrent()
                 } else {
-                    showFullTime()
+                    showIncoming()
                 }
-            case .fullTime:
-                break
+                return .shot
             }
+            if !halfTimePassed {
+                showHalfTime()
+                return .halfTime
+            }
+            showFullTime()
+            return .fullTime
+        }
+
+        fileprivate mutating func showHalfTime() {
+            phase = .halfTime
+            commentary = "Half time."
+            sentenceVisible = true
+            showsPasser = false
+            ballProgress = 1
         }
 
         fileprivate mutating func showFullTime() {
@@ -147,14 +205,42 @@ struct HighlightFeature {
 
         /// The same frame the clock reaches after the last shot.
         fileprivate mutating func finishReel() {
+            halfTimePassed = true
             if let last = shots.indices.last {
                 index = last
-                let shot = shots[last]
-                minute = shot.minute
-                attackingIsHome = shot.isHome
-                result = shot.result
+                present(shots[last])
             }
             showFullTime()
+        }
+
+        /// Begins the second half at its first shot. Shots already shown stay shown.
+        fileprivate mutating func beginSecondHalf() -> Move {
+            halfTimePassed = true
+            guard let next = shots.indices.first(where: { shots[$0].minute > HighlightScript.halfMinute }) else {
+                showFullTime()
+                return .fullTime
+            }
+            index = next
+            if reduceMotion {
+                revealCurrent()
+            } else {
+                showIncoming()
+            }
+            return .shot
+        }
+
+        private mutating func present(_ shot: Shot) {
+            minute = shot.minute
+            commentary = line(for: shot)
+            showsPasser = shot.passer != nil
+            attackingIsHome = shot.isHome
+            result = shot.result
+            let next = HighlightScript.make(shot: shot, matchSeed: matchSeed)
+            if let previous = script?.attackingEnd, previous != next.attackingEnd {
+                cameraFlip += 1
+            }
+            script = next
+            attackingEnd = next.attackingEnd
         }
 
         private func line(for shot: Shot) -> String {
@@ -190,12 +276,14 @@ struct HighlightFeature {
             case skipButtonTapped
             case statsButtonTapped
             case backButtonTapped
+            case secondHalfStarted
         }
 
         @CasePathable
         enum Delegate {
             case dismissed
             case showStats
+            case showHalfTime
         }
     }
 
@@ -210,6 +298,9 @@ struct HighlightFeature {
                 guard !state.hasAppeared else { return .none }
                 state.hasAppeared = true
                 state.reduceMotion = reduceMotion
+                if state.phase == .halfTime {
+                    return .send(.delegate(.showHalfTime))
+                }
                 guard state.phase != .fullTime else { return .none }
                 if reduceMotion {
                     state.revealCurrent()
@@ -218,24 +309,19 @@ struct HighlightFeature {
                 return scheduleBeat(for: state.phase)
 
             case .view(.advance):
-                guard state.phase != .fullTime else { return .none }
+                guard state.phase != .fullTime, state.phase != .halfTime else { return .none }
                 if state.reduceMotion {
-                    state.showNextResult()
-                    return .none
+                    let move = state.showNextResult()
+                    return effect(for: move, state: state)
                 }
                 switch state.phase {
                 case .incoming:
                     state.revealCurrent()
                     return scheduleBeat(for: state.phase)
                 case .shown:
-                    if state.index + 1 < state.shots.count {
-                        state.index += 1
-                        state.showIncoming()
-                        return scheduleBeat(for: state.phase)
-                    }
-                    state.showFullTime()
-                    return .none
-                case .fullTime:
+                    let move = state.moveOn(revealing: false)
+                    return effect(for: move, state: state)
+                case .halfTime, .fullTime:
                     return .none
                 }
 
@@ -257,9 +343,29 @@ struct HighlightFeature {
                     .send(.delegate(.dismissed))
                 )
 
+            case .view(.secondHalfStarted):
+                guard state.phase == .halfTime else { return .none }
+                let move = state.beginSecondHalf()
+                return effect(for: move, state: state)
+
             case .delegate:
                 return .none
             }
+        }
+    }
+
+    private func effect(for move: State.Move, state: State) -> Effect<Action> {
+        switch move {
+        case .halfTime:
+            return .merge(
+                .cancel(id: CancelID.beat),
+                .send(.delegate(.showHalfTime))
+            )
+        case .shot:
+            guard !state.reduceMotion, state.phase == .incoming else { return .none }
+            return scheduleBeat(for: .incoming)
+        case .fullTime, .waiting:
+            return .cancel(id: CancelID.beat)
         }
     }
 

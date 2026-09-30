@@ -851,8 +851,28 @@ struct MatchweekFeature {
                 )
                 return .none
 
+            case .highlight(.presented(.delegate(.showHalfTime))):
+                guard state.highlight?.phase == .halfTime, let pending = state.pending else { return .none }
+                let firstHalf = pending.userMatch.shots.filter { $0.minute <= HighlightScript.halfMinute }
+                state.stats = MatchStatsFeature.State(
+                    shots: firstHalf,
+                    title: "Half time",
+                    homeShort: pending.home.shortName,
+                    awayShort: pending.away.shortName,
+                    homeName: pending.home.name,
+                    awayName: pending.away.name,
+                    homeID: pending.home.id,
+                    awayID: pending.away.id,
+                    exit: .secondHalf
+                )
+                return .none
+
             case .highlight:
                 return .none
+
+            case .stats(.presented(.delegate(.startSecondHalf))):
+                state.stats = nil
+                return .send(.highlight(.presented(.view(.secondHalfStarted))))
 
             case .stats(.presented(.delegate(.dismissed))):
                 state.highlight = nil
