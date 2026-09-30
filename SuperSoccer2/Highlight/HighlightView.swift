@@ -45,7 +45,6 @@ struct HighlightView: View {
         .onAppear {
             store.send(.view(.onAppear(reduceMotion: reduceMotion)))
         }
-        .animation(ballAnimation, value: store.ballProgress)
         .onChange(of: store.cameraFlip) { _, _ in
             guard !reduceMotion else { return }
             squashed = true
@@ -61,11 +60,10 @@ struct HighlightView: View {
             script: store.script,
             progress: store.ballProgress,
             attackingEnd: store.attackingEnd,
-            attackingShirt: attackingKit.primary.color,
-            attackingShorts: attackingKit.secondary.color,
-            defendingShirt: defendingKit.primary.color,
-            defendingShorts: defendingKit.secondary.color,
-            minute: store.minuteText
+            attacking: attackingKit.primary.color,
+            defending: defendingKit.primary.color,
+            minute: store.minuteText,
+            animated: store.sentenceVisible && !reduceMotion && store.phase == .shown
         )
         .scaleEffect(y: squashed ? 0.08 : 1, anchor: .center)
         .rotation3DEffect(
@@ -74,11 +72,6 @@ struct HighlightView: View {
             perspective: 0.5
         )
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: squashed)
-    }
-
-    private var ballAnimation: Animation? {
-        guard store.sentenceVisible, !reduceMotion else { return nil }
-        return .easeInOut(duration: 1.7)
     }
 
     private var scoreboard: some View {

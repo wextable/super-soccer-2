@@ -12,6 +12,38 @@ struct HighlightScriptTests {
         #expect(first.beats.isEmpty == false)
     }
 
+    @Test func playbackSamplesThePathInsteadOfTheEndpoints() {
+        let script = HighlightScript.make(shot: highlightShot(result: .goal, passer: true), matchSeed: 42)
+        let start = script.pose(at: 0).ball
+        let end = script.pose(at: 1).ball
+        #expect(start.distance(to: script.ballStart) < 0.000_001)
+        #expect(end.distance(to: script.ballEnd) < 0.000_001)
+        var previous = start
+        var traveled = 0.0
+        var longest = 0.0
+        for step in 1...20 {
+            let sample = script.pose(at: Double(step) / 20).ball
+            let hop = previous.distance(to: sample)
+            traveled += hop
+            longest = max(longest, hop)
+            previous = sample
+        }
+        let trip = start.distance(to: end)
+        #expect(traveled + 0.000_001 >= trip)
+        #expect(longest < traveled * 0.5)
+        let middle = script.pose(at: 0.45).ball
+        #expect(middle.distance(to: start) > 0.01)
+        #expect(middle.distance(to: end) > 0.01)
+        let shooter = script.actors[0].id
+        let shooterStart = script.pose(at: 0).places.first { $0.id == shooter }?.point
+        let shooterMiddle = script.pose(at: 0.45).places.first { $0.id == shooter }?.point
+        let shooterEnd = script.pose(at: 1).places.first { $0.id == shooter }?.point
+        if let shooterStart, let shooterMiddle, let shooterEnd, shooterStart.distance(to: shooterEnd) > 0.05 {
+            #expect(shooterMiddle.distance(to: shooterStart) > 0.01)
+            #expect(shooterMiddle.distance(to: shooterEnd) > 0.01)
+        }
+    }
+
     @Test func openPlayChangesPatternLaneAndPassCount() {
         var templates: Set<HighlightTemplate> = []
         var passCounts: Set<Int> = []
