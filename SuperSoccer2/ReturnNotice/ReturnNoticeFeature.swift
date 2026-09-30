@@ -7,8 +7,6 @@ struct ReturnNoticeFeature {
     @ObservableState
     struct State: Equatable {
         var notice: ReturnNotice
-        var step: Int
-        var stepCount: Int
     }
 
     enum Action {

@@ -3,6 +3,9 @@ import SwiftUI
 
 struct InjuryNoticeView: View {
     let store: StoreOf<InjuryNoticeFeature>
+    var walkHeader: String
+    var step: Int
+    var stepCount: Int
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -27,10 +30,10 @@ struct InjuryNoticeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
+            CeremonyFrame(header: walkHeader, step: step, stepCount: stepCount)
             Text("Uh oh")
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.fitnessRed.color)
-            StepCountRule(step: store.step, stepCount: store.stepCount)
             Text(store.notice.positionTitle)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.color(labeled: store.notice.positionTitle))
