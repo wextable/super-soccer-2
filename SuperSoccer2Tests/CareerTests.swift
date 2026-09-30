@@ -32,6 +32,7 @@ struct CareerPersistenceTests {
         await store.finish()
         #expect(writes.withLock { $0 } == 1)
         let resolved = try #require(await box.load())
+        #expect(resolved == store.state.career)
         #expect(resolved.committedWeeks == 1)
         #expect(resolved.weekIndex == 0)
         #expect(resolved.pending != nil)
@@ -125,6 +126,7 @@ struct CareerPersistenceTests {
         await store.finish()
         #expect(writes.withLock { $0 } == 1)
         let saved = try #require(await box.load())
+        #expect(saved == store.state.career)
         #expect(saved.record?.awards.map(\.kind) == AwardKind.allCases)
         #expect(saved.standings.allSatisfy { $0.played == 38 })
         #expect(saved.clubs == store.state.clubs)
@@ -132,7 +134,7 @@ struct CareerPersistenceTests {
 
     @Test func continueOpensTheClubTab() async throws {
         let season = LeagueDraft.makeLeague(seed: 9)
-        var career = Career(matchweek: MatchweekFeature.State(userClubID: "norwich-city", season: season))
+        var career = MatchweekFeature.State(userClubID: "norwich-city", season: season).career
         career.weekIndex = 4
         career.committedWeeks = 4
         let box = CareerBox()
@@ -164,7 +166,7 @@ struct CareerPersistenceTests {
 
     @Test func newGameReplacesTheSavedCareer() async throws {
         let season = LeagueDraft.makeLeague(seed: 9)
-        var career = Career(matchweek: MatchweekFeature.State(userClubID: "norwich-city", season: season))
+        var career = MatchweekFeature.State(userClubID: "norwich-city", season: season).career
         career.weekIndex = 4
         let box = CareerBox()
         await box.save(career)
@@ -274,7 +276,7 @@ struct CareerPersistenceTests {
         await played.send(.view(.simulateSeasonButtonTapped))
         await played.send(.seasonAlert(.presented(.confirm)))
         await played.finish()
-        let career = Career(matchweek: played.state)
+        let career = played.state.career
         #expect(career.record != nil)
         #expect(career.clubs.contains { club in club.players.contains { $0.injury != nil || $0.skillsEarned > 0 || $0.condition != 100 } })
 
@@ -290,6 +292,7 @@ struct CareerPersistenceTests {
         let loaded = try #require(await file.load())
         #expect(loaded == career)
         let restored = MatchweekFeature.State(career: loaded)
+        #expect(restored.career == career)
         #expect(restored.tab == .club)
         #expect(restored.clubs == career.clubs)
         #expect(restored.standings == career.standings)
@@ -302,9 +305,99 @@ struct CareerPersistenceTests {
         #expect(restored.shownWeekIndex == career.weekIndex)
     }
 
+    @Test func quittingMidCeremonyKeepsTheQueues() async throws {
+        let season = LeagueDraft.makeLeague(seed: 3)
+        var state = MatchweekFeature.State(userClubID: "everton", season: season)
+        let player = try #require(state.userClub?.starters.first)
+        state.committedWeeks = 1
+        state.injuryNotices = [
+            InjuryNotice(
+                id: "fresh",
+                playerName: "Ada Keeper",
+                positionTitle: "Keeper",
+                ailment: "sprained ankle",
+                cause: "Arsenal's Bo Queef elbowed him.",
+                weeksLeft: 2
+            )
+        ]
+        state.skillOffers = [SkillOffer(id: "offer", playerID: player.id, clubID: "everton")]
+        state.returnNotices = [
+            ReturnNotice(
+                id: "back",
+                playerName: "Cy Defender",
+                positionTitle: "Defender",
+                ailment: "dead leg",
+                weekIndex: 0
+            )
+        ]
+        state.tab = .week
+        state.browsedWeekIndex = 2
+        state.didFail = true
+        state.lineupRevision = 4
+        state.skillsChosen = 3
+        state.skillFollowUp = .nextWeek
+        let openedInjury = state.presentNextInjury()
+        #expect(openedInjury)
+        #expect(state.injuryNotice != nil)
+
+        let encoded = try JSONEncoder().encode(state.career)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        for key in ["tab", "browsedWeekIndex", "didFail", "lineupRevision", "skillsChosen", "skillFollowUp"] {
+            #expect(object[key] == nil)
+        }
+        #expect(object["injuryNotices"] != nil)
+        #expect(object["skillOffers"] != nil)
+        #expect(object["returnNotices"] != nil)
+
+        let loaded = try JSONDecoder().decode(Career.self, from: encoded)
+        let resumed = MatchweekFeature.State(career: loaded)
+        #expect(resumed.career.injuryNotices == state.injuryNotices)
+        #expect(resumed.career.skillOffers == state.skillOffers)
+        #expect(resumed.career.returnNotices == state.returnNotices)
+        #expect(resumed.injuryNotice == nil)
+        #expect(resumed.skillChoice == nil)
+        #expect(resumed.returnNotice == nil)
+        #expect(resumed.tab == .club)
+        #expect(resumed.browsedWeekIndex == nil)
+        #expect(resumed.didFail == false)
+        #expect(resumed.lineupRevision == 0)
+        #expect(resumed.skillsChosen == 0)
+        #expect(resumed.skillFollowUp == nil)
+
+        let store = TestStore(initialState: resumed) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+        await store.send(.view(.nextFixtureButtonTapped))
+        #expect(store.state.weekIndex == 0)
+        #expect(store.state.injuryNotice?.notice.playerName == "Ada Keeper")
+        #expect(store.state.skillChoice == nil)
+        #expect(store.state.returnNotice == nil)
+    }
+
+    @Test func aFinishedSeasonDropsUnreadReturns() throws {
+        let season = LeagueDraft.makeLeague(seed: 3)
+        var career = MatchweekFeature.State(userClubID: "everton", season: season).career
+        career.weekIndex = career.weeks.count - 1
+        career.committedWeeks = career.weeks.count
+        career.returnNotices = [
+            ReturnNotice(
+                id: "back",
+                playerName: "Ada Keeper",
+                positionTitle: "Keeper",
+                ailment: "sprained ankle",
+                weekIndex: career.weekIndex
+            )
+        ]
+        let week = MatchweekFeature.State(career: career)
+        #expect(week.seasonIsOver)
+        #expect(week.returnNotice == nil)
+        #expect(week.career.returnNotices.isEmpty)
+    }
+
     @Test func aCareerMissingCurrentFieldsDoesNotDecode() throws {
         let season = LeagueDraft.makeLeague(seed: 3)
-        var career = Career(matchweek: MatchweekFeature.State(userClubID: "everton", season: season))
+        var career = MatchweekFeature.State(userClubID: "everton", season: season).career
         career.weekIndex = 4
         career.committedWeeks = 4
         career.playedWeeks = [[
@@ -346,7 +439,7 @@ struct CareerPersistenceTests {
 
     @Test func continueDropsACareerTheCurrentModelCannotRead() async throws {
         let season = LeagueDraft.makeLeague(seed: 2)
-        let career = Career(matchweek: MatchweekFeature.State(userClubID: season.clubs[0].id, season: season))
+        let career = MatchweekFeature.State(userClubID: season.clubs[0].id, season: season).career
         var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(career)) as? [String: Any])
         var clubs = try #require(object["clubs"] as? [[String: Any]])
         var players = try #require(clubs[0]["players"] as? [[String: Any]])

@@ -646,7 +646,7 @@ struct AppFeatureTests {
 
     @Test func aNewGameFromTheMenuDismissesSelectionWhenAClubIsChosen() async throws {
         let season = LeagueDraft.makeLeague(seed: 9)
-        var career = Career(matchweek: MatchweekFeature.State(userClubID: "norwich-city", season: season))
+        var career = MatchweekFeature.State(userClubID: "norwich-city", season: season).career
         career.weekIndex = 4
         let box = CareerBox()
         await box.save(career)
