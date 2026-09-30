@@ -38,6 +38,9 @@ struct SkillChoiceFeature {
             return "His \(selectedStat.label) has really improved."
         }
 
+        /// The level this ceremony grants. The squad still holds the level from before the skill is applied.
+        var displayedLevel: Int { player.level + 1 }
+
         /// The number beside the name. It moves when the bar finishes, not when the row is tapped.
         var displayedOverall: Int {
             guard phase == .grown, let selectedStat else { return player.overall }

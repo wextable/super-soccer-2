@@ -603,8 +603,8 @@ struct MatchweekFeatureTests {
         #expect(cityPlace == 1)
         let opponent = try #require(state.opponent)
         #expect(state.keyPlayersTitle == "\(opponent.name)'s key players")
-        #expect(state.leaguePlace(for: city.id) == nil)
-        #expect(state.leaguePlace(for: opponent.id) == nil)
+        #expect(state.leaguePlace(for: city.id) == cityPlace)
+        #expect(state.leaguePlace(for: opponent.id) == state.places[opponent.id])
         #expect(state.leaguePlace(for: "missing") == nil)
     }
 

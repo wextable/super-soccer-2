@@ -36,17 +36,15 @@ struct ClubSelectionFeature {
                 let seed = entropy.nextSeed()
                 let season = LeagueDraft.makeLeague(seed: seed)
                 guard
-                    let city = season.clubs.first(where: { $0.id == "manchester-city" }),
-                    let norwich = season.clubs.first(where: { $0.id == "norwich-city" }),
                     season.clubs.count == LeagueDraft.clubCount,
-                    [city, norwich].allSatisfy({ $0.starters.count == 11 })
+                    season.clubs.allSatisfy({ $0.starters.count == 11 })
                 else {
                     state.didFailToLoad = true
                     return .none
                 }
                 state.squadSeed = seed
                 state.season = season
-                state.clubs = [city, norwich]
+                state.clubs = season.clubs.sorted(by: Club.prestigeOrder)
                 state.didFailToLoad = false
                 return .none
 

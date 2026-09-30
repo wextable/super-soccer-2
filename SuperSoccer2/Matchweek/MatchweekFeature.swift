@@ -318,11 +318,9 @@ struct MatchweekFeature {
             return "\(name)'s key players"
         }
 
-        /// League place on the match screen. Hidden until this club has played.
+        /// League place on the match screen, including the opening week.
         func leaguePlace(for clubID: String) -> Int? {
-            let played = standings.first { $0.clubID == clubID }?.played ?? 0
-            guard played > 0 else { return nil }
-            return places[clubID]
+            places[clubID]
         }
 
         var userMatchPlace: Int? { leaguePlace(for: userClubID) }

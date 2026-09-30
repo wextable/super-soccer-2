@@ -510,7 +510,8 @@ struct AppFeatureTests {
         }
         await store.send(.selection(.presented(.view(.onAppear))))
         let selection = try #require(store.state.selection)
-        #expect(selection.clubs.map(\.name) == ["Manchester City", "Norwich City"])
+        #expect(selection.clubs.count == 20)
+        #expect(selection.clubs.map(\.id) == selection.season?.clubs.sorted(by: Club.prestigeOrder).map(\.id))
         #expect(selection.season?.clubs.count == 20)
 
         await store.send(.selection(.presented(.view(.clubTapped("norwich-city")))))

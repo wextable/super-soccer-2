@@ -234,6 +234,11 @@ struct SkillChoiceLimitTests {
         var grown = player
         grown.ratings.shooting += points
         #expect(grown.overall != player.overall)
+        #expect(SkillChoiceFeature.State(
+            offerID: "offer",
+            player: player,
+            choices: WeekTuning.current.skillChoices
+        ).displayedLevel == player.level + 1)
         let plays = OSAllocatedUnfairLock(initialState: 0)
         let clock = TestClock()
         let store = skillStore(player: player, clock: clock) {

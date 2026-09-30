@@ -44,6 +44,10 @@ struct SkillChoiceView: View {
             Text(store.player.position.title)
                 .font(theme.type.eyebrow)
                 .foregroundStyle(theme.colors.color(for: store.player.position))
+            Text("Level \(store.displayedLevel)")
+                .font(theme.type.homeLine)
+                .foregroundStyle(theme.colors.text.color)
+                .accessibilityLabel("Level \(store.displayedLevel)")
             HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
                 Text(store.player.fullName)
                     .font(theme.type.display)

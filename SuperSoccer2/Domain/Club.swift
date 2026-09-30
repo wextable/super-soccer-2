@@ -71,6 +71,43 @@ struct Club: Codable, Equatable, Sendable, Identifiable {
     var summaryLine: String {
         "Attack \(attack)  ·  Defense \(defense)"
     }
+
+    /// Prestige of this squad, in half stars from 1 to 5.
+    var prestigeStars: Double {
+        Self.prestigeStars(overall: overall)
+    }
+
+    /// Perceived goodness, not a line from overall 0–99 onto the star scale.
+    /// An overall around 50 is very bad and is 1 star. The steps sit on the band
+    /// this league actually rolls, about 64 to 87, so the twenty clubs spread
+    /// across the scale instead of stacking on one or two values.
+    static func prestigeStars(overall: Int) -> Double {
+        switch overall {
+        case ..<66: 1
+        case 66..<69: 1.5
+        case 69..<72: 2
+        case 72..<74: 2.5
+        case 74..<76: 3
+        case 76..<79: 3.5
+        case 79..<82: 4
+        case 82..<85: 4.5
+        default: 5
+        }
+    }
+
+    static func prestigeLabel(stars: Double) -> String {
+        if stars == 1 { return "1 star" }
+        if stars == stars.rounded(.down) { return "\(Int(stars)) stars" }
+        return "\(stars) stars"
+    }
+
+    /// Highest prestige first. The same star rating keeps alphabetical order.
+    static func prestigeOrder(_ lhs: Club, _ rhs: Club) -> Bool {
+        if lhs.prestigeStars != rhs.prestigeStars {
+            return lhs.prestigeStars > rhs.prestigeStars
+        }
+        return lhs.name < rhs.name
+    }
 }
 
 enum TeamRatings {
