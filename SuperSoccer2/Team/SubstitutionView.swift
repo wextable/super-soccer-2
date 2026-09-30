@@ -81,6 +81,6 @@ struct SubstitutionView: View {
     }
 
     private func nameLabel(_ player: Player) -> String {
-        "Replace with \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
+        "\(store.heading) \(player.fullName), overall \(player.overall), \(player.fitnessBand().label), fitness \(player.condition)"
     }
 }
