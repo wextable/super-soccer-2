@@ -19,7 +19,7 @@ struct MatchStatsView: View {
                 } else {
                     shots
                 }
-                Button("Back to the week") {
+                Button(store.exitTitle) {
                     store.send(.view(.backButtonTapped))
                 }
                 .buttonStyle(ThemeActionButtonStyle())

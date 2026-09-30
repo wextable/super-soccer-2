@@ -5,26 +5,21 @@ struct HighlightView: View {
     @Bindable var store: StoreOf<HighlightFeature>
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var squashed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.space.md) {
             scoreboard
             ZStack(alignment: .bottom) {
-                PitchView(
-                    progress: store.ballProgress,
-                    attacking: attackingColor,
-                    defending: defendingColor,
-                    showsPasser: store.showsPasser && store.phase != .fullTime,
-                    result: store.result
-                )
+                pitch
                 ticker
                     .padding(theme.space.sm)
             }
-            if store.reduceMotion, store.phase != .fullTime {
+            if store.reduceMotion && (store.phase == .incoming || store.phase == .shown) {
                 Button {
                     store.send(.view(.advance))
                 } label: {
-                    Text(nextTitle)
+                    Text(store.nextControlTitle)
                 }
                 .buttonStyle(ThemeActionButtonStyle())
             }
@@ -51,18 +46,39 @@ struct HighlightView: View {
             store.send(.view(.onAppear(reduceMotion: reduceMotion)))
         }
         .animation(ballAnimation, value: store.ballProgress)
+        .onChange(of: store.cameraFlip) { _, _ in
+            guard !reduceMotion else { return }
+            squashed = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(180))
+                squashed = false
+            }
+        }
+    }
+
+    private var pitch: some View {
+        PitchView(
+            script: store.script,
+            progress: store.ballProgress,
+            attackingEnd: store.attackingEnd,
+            attackingShirt: attackingKit.primary.color,
+            attackingShorts: attackingKit.secondary.color,
+            defendingShirt: defendingKit.primary.color,
+            defendingShorts: defendingKit.secondary.color,
+            minute: store.minuteText
+        )
+        .scaleEffect(y: squashed ? 0.08 : 1, anchor: .center)
+        .rotation3DEffect(
+            .degrees(squashed ? 75 : 0),
+            axis: (x: 1, y: 0, z: 0),
+            perspective: 0.5
+        )
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: squashed)
     }
 
     private var ballAnimation: Animation? {
         guard store.sentenceVisible, !reduceMotion else { return nil }
-        return .easeInOut(duration: 0.8)
-    }
-
-    private var nextTitle: String {
-        if store.phase == .shown, store.index + 1 >= store.shots.count {
-            return "Full time"
-        }
-        return "Next shot"
+        return .easeInOut(duration: 1.7)
     }
 
     private var scoreboard: some View {
@@ -101,6 +117,8 @@ struct HighlightView: View {
             return "\(store.minute) minutes, \(score), before the shot"
         case .shown:
             return "\(store.minute) minutes, \(score)"
+        case .halfTime:
+            return "Half time, \(score)"
         case .fullTime:
             return "Full time, \(score)"
         }
@@ -118,11 +136,11 @@ struct HighlightView: View {
             .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
     }
 
-    private var attackingColor: Color {
-        (store.attackingIsHome ? store.homeKit : store.awayKit).primary.color
+    private var attackingKit: Kit {
+        store.attackingIsHome ? store.homeKit : store.awayKit
     }
 
-    private var defendingColor: Color {
-        (store.attackingIsHome ? store.awayKit : store.homeKit).primary.color
+    private var defendingKit: Kit {
+        store.attackingIsHome ? store.awayKit : store.homeKit
     }
 }

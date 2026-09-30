@@ -215,13 +215,16 @@ struct CommentaryTests {
 @Suite
 @MainActor
 struct HighlightFeatureTests {
-    @Test func reelPlaysEachShotOnTheClockThenFullTime() async {
+    @Test func reelPausesAtHalfTimeThenFullTime() async {
         let clock = TestClock()
         let store = TestStore(initialState: HighlightFeature.State(match: reelMatch(), home: sampleHome(), away: sampleAway())) {
             HighlightFeature()
         } withDependencies: {
             $0.continuousClock = clock
         }
+        let shots = store.state.shots
+        let penalty = HighlightScript.make(shot: shots[1], matchSeed: 7)
+        let later = HighlightScript.make(shot: shots[2], matchSeed: 7)
 
         #expect(store.state.shots.map(\.minute) == [6, 18, 44])
         #expect(store.state.phase == .incoming)
@@ -252,6 +255,9 @@ struct HighlightFeatureTests {
             $0.result = .goal
             $0.ballProgress = 0
             $0.sentenceVisible = false
+            $0.script = penalty
+            $0.attackingEnd = penalty.attackingEnd
+            $0.cameraFlip = 1
         }
 
         await clock.advance(by: HighlightFeature.beatDuration)
@@ -272,6 +278,9 @@ struct HighlightFeatureTests {
             $0.showsPasser = true
             $0.ballProgress = 0
             $0.sentenceVisible = false
+            $0.script = later
+            $0.attackingEnd = later.attackingEnd
+            $0.cameraFlip = 2
         }
 
         await clock.advance(by: HighlightFeature.beatDuration)
@@ -284,15 +293,24 @@ struct HighlightFeatureTests {
 
         await clock.advance(by: HighlightFeature.lineDuration)
         await store.receive(\.view.advance) {
+            $0.phase = .halfTime
+            $0.commentary = "Half time."
+            $0.showsPasser = false
+        }
+        await store.receive(\.delegate.showHalfTime)
+        await clock.advance(by: .seconds(3))
+
+        await store.send(.view(.secondHalfStarted)) {
+            $0.halfTimePassed = true
             $0.phase = .fullTime
             $0.commentary = "Full time."
-            $0.showsPasser = false
         }
 
         #expect(store.state.homeScore == 1)
         #expect(store.state.awayScore == 1)
         #expect(store.state.homeScore == store.state.finalHomeScore)
         #expect(store.state.awayScore == store.state.finalAwayScore)
+        #expect(store.state.index == 2)
     }
 
     @Test func reduceMotionShowsTheLineImmediately() async {
@@ -324,6 +342,10 @@ struct HighlightFeatureTests {
             $0.sentenceVisible = true
         }
 
+        let shots = store.state.shots
+        let penalty = HighlightScript.make(shot: shots[1], matchSeed: 7)
+        let later = HighlightScript.make(shot: shots[2], matchSeed: 7)
+
         await store.send(.view(.advance)) {
             $0.index = 1
             $0.minute = 18
@@ -331,6 +353,9 @@ struct HighlightFeatureTests {
             $0.attackingIsHome = true
             $0.result = .goal
             $0.homeScore = 1
+            $0.script = penalty
+            $0.attackingEnd = penalty.attackingEnd
+            $0.cameraFlip = 1
         }
 
         await store.send(.view(.advance)) {
@@ -340,12 +365,22 @@ struct HighlightFeatureTests {
             $0.attackingIsHome = false
             $0.showsPasser = true
             $0.awayScore = 1
+            $0.script = later
+            $0.attackingEnd = later.attackingEnd
+            $0.cameraFlip = 2
         }
 
         await store.send(.view(.advance)) {
+            $0.phase = .halfTime
+            $0.commentary = "Half time."
+            $0.showsPasser = false
+        }
+        await store.receive(\.delegate.showHalfTime)
+
+        await store.send(.view(.secondHalfStarted)) {
+            $0.halfTimePassed = true
             $0.phase = .fullTime
             $0.commentary = "Full time."
-            $0.showsPasser = false
         }
     }
 
@@ -357,6 +392,7 @@ struct HighlightFeatureTests {
             $0.continuousClock = clock
         }
 
+        let last = HighlightScript.make(shot: store.state.shots[2], matchSeed: 7)
         await store.send(.view(.onAppear(reduceMotion: false))) {
             $0.hasAppeared = true
         }
@@ -371,6 +407,8 @@ struct HighlightFeatureTests {
             $0.sentenceVisible = true
             $0.homeScore = 1
             $0.awayScore = 1
+            $0.script = last
+            $0.halfTimePassed = true
         }
         #expect(store.state.homeScore == store.state.finalHomeScore)
         #expect(store.state.awayScore == store.state.finalAwayScore)
@@ -403,10 +441,214 @@ struct HighlightFeatureTests {
         await store.send(.view(.backButtonTapped))
         await store.receive(\.delegate.dismissed)
     }
+
+    @Test func resumeContinuesAtTheSecondHalfShot() async {
+        let clock = TestClock()
+        let home = sampleHome()
+        let away = sampleAway()
+        let first = makeShot(
+            id: 0,
+            minute: 22,
+            result: .goal,
+            shooter: "Bo Scaramucci",
+            passer: "Chode Magnusson",
+            isHome: true
+        )
+        let second = makeShot(
+            id: 1,
+            minute: 71,
+            result: .save,
+            shooter: "Ada Striker",
+            keeper: "Hank Keeper",
+            isHome: true
+        )
+        let match = MatchResult(
+            homeScore: 1,
+            awayScore: 0,
+            shots: [first, second],
+            highlight: first,
+            commentary: "",
+            seed: 3
+        )
+        let store = TestStore(initialState: HighlightFeature.State(match: match, home: home, away: away)) {
+            HighlightFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+        }
+        let secondScript = HighlightScript.make(shot: second, matchSeed: 3)
+        let secondLine = Commentary.line(shot: second, attackingClub: home.name, defendingClub: away.name)
+
+        await store.send(.view(.onAppear(reduceMotion: false))) {
+            $0.hasAppeared = true
+        }
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.homeScore = 1
+        }
+        await clock.advance(by: HighlightFeature.lineDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .halfTime
+            $0.commentary = "Half time."
+            $0.showsPasser = false
+        }
+        await store.receive(\.delegate.showHalfTime)
+        #expect(store.state.index == 0)
+        #expect(store.state.minute == 22)
+
+        await store.send(.view(.secondHalfStarted)) {
+            $0.halfTimePassed = true
+            $0.index = 1
+            $0.phase = .incoming
+            $0.minute = 71
+            $0.commentary = secondLine
+            $0.result = .save
+            $0.ballProgress = 0
+            $0.sentenceVisible = false
+            $0.script = secondScript
+            $0.attackingEnd = .south
+            $0.cameraFlip = 1
+        }
+        #expect(store.state.homeScore == 1)
+        #expect(store.state.minute == 71)
+
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+        }
+        await clock.advance(by: HighlightFeature.lineDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .fullTime
+            $0.commentary = "Full time."
+        }
+        #expect(store.state.index == 1)
+        #expect(store.state.minute == 71)
+        #expect(store.state.homeScore == 1)
+        #expect(store.state.awayScore == 0)
+    }
+
+    @Test func aSecondHalfOpenerPausesBeforeItPlays() async {
+        let home = sampleHome()
+        let away = sampleAway()
+        let late = makeShot(id: 0, minute: 60, result: .goal, shooter: "Bo Scaramucci", isHome: true)
+        let match = MatchResult(
+            homeScore: 1,
+            awayScore: 0,
+            shots: [late],
+            highlight: late,
+            commentary: "",
+            seed: 8
+        )
+        let store = TestStore(initialState: HighlightFeature.State(match: match, home: home, away: away)) {
+            HighlightFeature()
+        }
+        let script = HighlightScript.make(shot: late, matchSeed: 8)
+        #expect(store.state.phase == .halfTime)
+        #expect(store.state.index == 0)
+        #expect(store.state.script == nil)
+
+        await store.send(.view(.onAppear(reduceMotion: true))) {
+            $0.hasAppeared = true
+            $0.reduceMotion = true
+        }
+        await store.receive(\.delegate.showHalfTime)
+        await store.send(.view(.secondHalfStarted)) {
+            $0.halfTimePassed = true
+            $0.phase = .shown
+            $0.minute = 60
+            $0.commentary = "Bo Scaramucci of Manchester City scores."
+            $0.result = .goal
+            $0.homeScore = 1
+            $0.script = script
+            $0.attackingEnd = .south
+        }
+        #expect(store.state.index == 0)
+    }
+
+    @Test func startSecondHalfReturnsToTheReel() async {
+        let season = LeagueDraft.makeLeague(seed: 4)
+        let home = season.clubs.first { $0.id == "norwich-city" }!
+        let away = season.clubs.first { $0.id != home.id }!
+        let early = makeShot(id: 0, minute: 12, result: .goal, shooter: "Bo Scaramucci", isHome: true)
+        let late = makeShot(id: 1, minute: 77, result: .miss, shooter: "Ada Striker", isHome: true)
+        let match = MatchResult(
+            homeScore: 1,
+            awayScore: 0,
+            shots: [early, late],
+            highlight: early,
+            commentary: "",
+            seed: 4
+        )
+        var week = MatchweekFeature.State(userClubID: home.id, season: season)
+        week.pending = Matchweek.Played(
+            scorelines: [],
+            tallies: [],
+            userMatch: match,
+            home: home,
+            away: away
+        )
+        week.highlight = HighlightFeature.State(match: match, home: home, away: away)
+        let store = TestStore(initialState: week) {
+            MatchweekFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.highlight(.presented(.view(.onAppear(reduceMotion: true)))))
+        await store.send(.highlight(.presented(.view(.advance))))
+        await store.skipReceivedActions()
+        #expect(store.state.highlight?.phase == .halfTime)
+        #expect(store.state.stats?.title == "Half time")
+        #expect(store.state.stats?.exit == .secondHalf)
+        #expect(store.state.stats?.exitTitle == "Start second half")
+        #expect(store.state.stats?.homeGoals == 1)
+        #expect(store.state.stats?.awayGoals == 0)
+        #expect(store.state.stats?.rows.map(\.minute) == [12])
+        #expect(store.state.currentWeekIsInTheTable == false)
+
+        await store.send(.stats(.presented(.view(.backButtonTapped))))
+        await store.skipReceivedActions()
+        #expect(store.state.stats == nil)
+        #expect(store.state.highlight?.index == 1)
+        #expect(store.state.highlight?.minute == 77)
+        #expect(store.state.highlight?.phase == .shown)
+        #expect(store.state.highlight?.attackingEnd == .south)
+        #expect(store.state.highlight?.halfTimePassed == true)
+        #expect(store.state.currentWeekIsInTheTable == false)
+        #expect(store.state.committedWeeks == 0)
+    }
 }
 
 @Suite
 struct MatchStatsTests {
+    @Test func halfTimeAsksToStartTheSecondHalf() {
+        let half = MatchStatsFeature.State(
+            shots: [makeShot(minute: 12, result: .goal, shooter: "Bo Scaramucci")],
+            title: "Half time",
+            homeShort: "MCI",
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City",
+            exit: .secondHalf
+        )
+        #expect(half.title == "Half time")
+        #expect(half.exitTitle == "Start second half")
+        #expect(half.homeGoals == 1)
+        let full = MatchStatsFeature.State(
+            shots: [],
+            homeShort: "MCI",
+            awayShort: "NOR",
+            homeName: "Manchester City",
+            awayName: "Norwich City"
+        )
+        #expect(full.title == "Full time")
+        #expect(full.exitTitle == "Back to the week")
+        #expect(full.exit == .week)
+    }
+
     @Test func statsListTheShotsInMinuteOrder() {
         let state = MatchStatsFeature.State(
             shots: [

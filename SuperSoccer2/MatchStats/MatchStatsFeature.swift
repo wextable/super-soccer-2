@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-/// Shot list shown after the reel. A later halftime stop can pass an earlier slice of the same shots.
+/// Shot list shown at half time and full time. Half time passes the first-half shots and a different exit.
 @Reducer
 struct MatchStatsFeature {
     @ObservableState
@@ -9,7 +9,22 @@ struct MatchStatsFeature {
         var title: String
         var homeShort: String
         var awayShort: String
+        var exit: Exit
         var rows: [Row]
+
+        enum Exit: Equatable, Sendable {
+            case week
+            case secondHalf
+        }
+
+        var exitTitle: String {
+            switch exit {
+            case .week:
+                "Back to the week"
+            case .secondHalf:
+                "Start second half"
+            }
+        }
 
         struct Row: Equatable, Identifiable, Sendable {
             var id: Int
@@ -44,11 +59,13 @@ struct MatchStatsFeature {
             homeName: String,
             awayName: String,
             homeID: String = "",
-            awayID: String = ""
+            awayID: String = "",
+            exit: Exit = .week
         ) {
             self.title = title
             self.homeShort = homeShort
             self.awayShort = awayShort
+            self.exit = exit
             rows = shots
                 .enumerated()
                 .filter { $0.element.result != .miss }
@@ -95,14 +112,20 @@ struct MatchStatsFeature {
         @CasePathable
         enum Delegate {
             case dismissed
+            case startSecondHalf
         }
     }
 
     var body: some ReducerOf<Self> {
-        Reduce<State, Action> { _, action in
+        Reduce<State, Action> { state, action in
             switch action {
             case .view(.backButtonTapped):
-                return .send(.delegate(.dismissed))
+                switch state.exit {
+                case .week:
+                    return .send(.delegate(.dismissed))
+                case .secondHalf:
+                    return .send(.delegate(.startSecondHalf))
+                }
             case .delegate:
                 return .none
             }
