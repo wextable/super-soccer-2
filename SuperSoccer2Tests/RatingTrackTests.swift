@@ -328,10 +328,7 @@ private func skillStore(
         initialState: SkillChoiceFeature.State(
             offerID: "offer",
             player: player,
-            choices: WeekTuning.current.skillChoices,
-            step: 1,
-            stepCount: 1,
-            contextLine: "Before the next week"
+            choices: WeekTuning.current.skillChoices
         )
     ) {
         SkillChoiceFeature()

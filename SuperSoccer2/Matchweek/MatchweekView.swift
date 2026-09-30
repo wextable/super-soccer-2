@@ -64,20 +64,8 @@ struct MatchweekView: View {
         ) { highlightStore in
             MatchLineView(week: store, highlight: highlightStore)
         }
-        .fullScreenCover(
-            item: $store.scope(state: \.skillChoice, action: \.skillChoice)
-        ) { skillStore in
-            SkillChoiceView(store: skillStore)
-        }
-        .sheet(
-            item: $store.scope(state: \.injuryNotice, action: \.injuryNotice)
-        ) { noticeStore in
-            InjuryNoticeView(store: noticeStore)
-        }
-        .sheet(
-            item: $store.scope(state: \.returnNotice, action: \.returnNotice)
-        ) { noticeStore in
-            ReturnNoticeView(store: noticeStore)
+        .background {
+            WeekCeremonyHost(week: store)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.committedWeeks)
         .sensoryFeedback(.selection, trigger: store.lineupRevision)

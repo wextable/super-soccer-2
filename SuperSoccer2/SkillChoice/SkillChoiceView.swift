@@ -3,6 +3,9 @@ import SwiftUI
 
 struct SkillChoiceView: View {
     let store: StoreOf<SkillChoiceFeature>
+    var walkHeader: String
+    var step: Int
+    var stepCount: Int
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -30,12 +33,7 @@ struct SkillChoiceView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: theme.space.xs) {
-            Text(store.contextLine)
-                .font(theme.type.eyebrow)
-                .foregroundStyle(theme.colors.secondaryText.color)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
-            StepCountRule(step: store.step, stepCount: store.stepCount, centered: true)
+            CeremonyFrame(header: walkHeader, step: step, stepCount: stepCount)
             Text("Level up")
                 .font(theme.type.display)
                 .foregroundStyle(theme.colors.title.color)

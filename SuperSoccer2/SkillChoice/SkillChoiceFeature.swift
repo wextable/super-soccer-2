@@ -18,10 +18,6 @@ struct SkillChoiceFeature {
         var offerID: String
         var player: Player
         var choices: [SkillChoice]
-        var step: Int
-        var stepCount: Int
-        /// Why this screen is in the way, such as “Before the next week”.
-        var contextLine: String
         var selectedStat: PlayerStat? = nil
         var phase: Phase = .choosing
 

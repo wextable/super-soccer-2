@@ -7,8 +7,6 @@ struct InjuryNoticeFeature {
     @ObservableState
     struct State: Equatable {
         var notice: InjuryNotice
-        var step: Int
-        var stepCount: Int
     }
 
     enum Action {

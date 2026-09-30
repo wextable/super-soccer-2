@@ -4,74 +4,67 @@ import ComposableArchitecture
 /// The growth effect sends two actions. Waiting for the last one finishes the bar.
 @MainActor
 func settleSkillChoice(_ store: TestStoreOf<MatchweekFeature>) async {
-    guard store.state.skillChoice?.phase != .grown else { return }
-    await store.receive(\.skillChoice.presented.internal.grown)
+    guard let phase = store.state.ceremony?.levelUp?.phase, phase != .grown else { return }
+    await store.receive(\.ceremony.levelUp.presented.internal.grown)
 }
 
-/// Injuries and skill picks sit in front of the week moving on. Tests that only care about the next week walk through them.
-/// A level up stays up through its bar, then Continue opens the next one or the week.
+/// Injuries, level-ups, and returns sit in front of the week. Tests that only care about the next week walk through them.
+/// A level up stays up through its bar, then Continue opens the next notice or the week.
 @MainActor
 func finishPresentedWeekSteps(_ store: TestStoreOf<MatchweekFeature>) async {
-    store.dependencies.continuousClock = ImmediateClock()
-    for _ in 0..<96 {
-        if store.state.injuryNotice != nil {
-            await store.send(.injuryNotice(.presented(.view(.continueTapped))))
-            await store.skipReceivedActions()
-            continue
-        }
-        if store.state.returnNotice != nil {
-            await store.send(.returnNotice(.presented(.view(.continueTapped))))
-            await store.skipReceivedActions()
-            continue
-        }
-        if let choice = store.state.skillChoice {
-            switch choice.phase {
-            case .choosing:
-                let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) < choice.player.potential.value(for: $0.stat) }?.stat
-                    ?? choice.choices[0].stat
-                await store.send(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false)))))
-                await store.skipReceivedActions()
-            case .selected, .growing:
-                await store.receive(\.skillChoice.presented.internal.grown)
-            case .grown:
-                await store.send(.skillChoice(.presented(.view(.continueTapped))))
-                await store.skipReceivedActions()
-            }
-            continue
-        }
-        break
-    }
+    await walkCeremony(
+        read: { store.state.ceremony },
+        send: { await store.send(.ceremony($0)) },
+        skip: { await store.skipReceivedActions() },
+        settleLevelUp: { await store.receive(\.ceremony.levelUp.presented.internal.grown) },
+        prepare: { store.dependencies.continuousClock = ImmediateClock() }
+    )
 }
 
 @MainActor
 func finishPresentedWeekSteps(_ store: TestStoreOf<AppFeature>) async {
-    store.dependencies.continuousClock = ImmediateClock()
+    await walkCeremony(
+        read: { store.state.game?.ceremony },
+        send: { await store.send(.game(.ceremony($0))) },
+        skip: { await store.skipReceivedActions() },
+        settleLevelUp: { await store.receive(\.game.ceremony.levelUp.presented.internal.grown) },
+        prepare: { store.dependencies.continuousClock = ImmediateClock() }
+    )
+}
+
+@MainActor
+private func walkCeremony(
+    read: () -> WeekCeremonyFeature.State?,
+    send: (WeekCeremonyFeature.Action) async -> Void,
+    skip: () async -> Void,
+    settleLevelUp: () async -> Void,
+    prepare: () -> Void
+) async {
+    prepare()
     for _ in 0..<96 {
-        if store.state.game?.injuryNotice != nil {
-            await store.send(.game(.injuryNotice(.presented(.view(.continueTapped)))))
-            await store.skipReceivedActions()
-            continue
-        }
-        if store.state.game?.returnNotice != nil {
-            await store.send(.game(.returnNotice(.presented(.view(.continueTapped)))))
-            await store.skipReceivedActions()
-            continue
-        }
-        if let choice = store.state.game?.skillChoice {
+        guard let ceremony = read(), ceremony.notices.indices.contains(ceremony.index) else { break }
+        switch ceremony.notices[ceremony.index] {
+        case .injury:
+            await send(.injury(.presented(.view(.continueTapped))))
+            await skip()
+        case .returnNotice:
+            await send(.returnNotice(.presented(.view(.continueTapped))))
+            await skip()
+        case .levelUp:
+            guard let choice = ceremony.levelUp else { return }
             switch choice.phase {
             case .choosing:
-                let stat = choice.choices.first { choice.player.ratings.value(for: $0.stat) < choice.player.potential.value(for: $0.stat) }?.stat
-                    ?? choice.choices[0].stat
-                await store.send(.game(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false))))))
-                await store.skipReceivedActions()
+                let stat = choice.choices.first {
+                    choice.player.ratings.value(for: $0.stat) < choice.player.potential.value(for: $0.stat)
+                }?.stat ?? choice.choices[0].stat
+                await send(.levelUp(.presented(.view(.statTapped(stat, reduceMotion: false)))))
+                await skip()
             case .selected, .growing:
-                await store.receive(\.game.skillChoice.presented.internal.grown)
+                await settleLevelUp()
             case .grown:
-                await store.send(.game(.skillChoice(.presented(.view(.continueTapped)))))
-                await store.skipReceivedActions()
+                await send(.levelUp(.presented(.view(.continueTapped))))
+                await skip()
             }
-            continue
         }
-        break
     }
 }

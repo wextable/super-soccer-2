@@ -86,16 +86,16 @@ struct CareerPersistenceTests {
         store.exhaustivity = .off
 
         await store.send(.view(.nextFixtureButtonTapped))
-        let choice = try #require(store.state.skillChoice)
+        let choice = try #require(store.state.ceremony?.levelUp)
         #expect(store.state.weekIndex == 0)
         #expect(choice.player.position == player.position)
         #expect(choice.player.ratings == player.ratings)
         store.dependencies.continuousClock = ImmediateClock()
-        await store.send(.skillChoice(.presented(.view(.statTapped(stat, reduceMotion: false)))))
+        await store.send(.ceremony(.levelUp(.presented(.view(.statTapped(stat, reduceMotion: false))))))
         await settleSkillChoice(store)
-        #expect(store.state.skillChoice?.phase == .grown)
+        #expect(store.state.ceremony?.levelUp?.phase == .grown)
         #expect(store.state.weekIndex == 0)
-        await store.send(.skillChoice(.presented(.view(.continueTapped))))
+        await store.send(.ceremony(.levelUp(.presented(.view(.continueTapped)))))
         await store.skipReceivedActions()
         await store.finish()
         let saved = try #require(await box.load())
@@ -158,8 +158,7 @@ struct CareerPersistenceTests {
         #expect(week.weekIndex == 4)
         #expect(week.committedWeeks == 4)
         #expect(week.userClubID == "norwich-city")
-        #expect(week.skillChoice == nil)
-        #expect(week.injuryNotice == nil)
+        #expect(week.ceremony == nil)
         #expect(store.state.selection == nil)
         #expect(store.state.menu == nil)
     }
@@ -299,8 +298,7 @@ struct CareerPersistenceTests {
         #expect(restored.record == career.record)
         #expect(restored.skillOffers == career.skillOffers)
         #expect(restored.playedWeeks == career.playedWeeks)
-        #expect(restored.skillChoice == nil)
-        #expect(restored.injuryNotice == nil)
+        #expect(restored.ceremony == nil)
         #expect(restored.browsedWeekIndex == nil)
         #expect(restored.shownWeekIndex == career.weekIndex)
     }
@@ -335,10 +333,12 @@ struct CareerPersistenceTests {
         state.didFail = true
         state.lineupRevision = 4
         state.skillsChosen = 3
-        state.skillFollowUp = .nextWeek
-        let openedInjury = state.presentNextInjury()
-        #expect(openedInjury)
-        #expect(state.injuryNotice != nil)
+        state.ceremony = WeekCeremonyFeature.State(
+            header: "After the match",
+            notices: state.injuryNotices.map { .injury($0) },
+            followUp: .nextWeek
+        )
+        #expect(state.ceremony?.injury != nil)
 
         let encoded = try JSONEncoder().encode(state.career)
         let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
@@ -354,15 +354,12 @@ struct CareerPersistenceTests {
         #expect(resumed.career.injuryNotices == state.injuryNotices)
         #expect(resumed.career.skillOffers == state.skillOffers)
         #expect(resumed.career.returnNotices == state.returnNotices)
-        #expect(resumed.injuryNotice == nil)
-        #expect(resumed.skillChoice == nil)
-        #expect(resumed.returnNotice == nil)
+        #expect(resumed.ceremony == nil)
         #expect(resumed.tab == .club)
         #expect(resumed.browsedWeekIndex == nil)
         #expect(resumed.didFail == false)
         #expect(resumed.lineupRevision == 0)
         #expect(resumed.skillsChosen == 0)
-        #expect(resumed.skillFollowUp == nil)
 
         let store = TestStore(initialState: resumed) {
             MatchweekFeature()
@@ -370,9 +367,9 @@ struct CareerPersistenceTests {
         store.exhaustivity = .off
         await store.send(.view(.nextFixtureButtonTapped))
         #expect(store.state.weekIndex == 0)
-        #expect(store.state.injuryNotice?.notice.playerName == "Ada Keeper")
-        #expect(store.state.skillChoice == nil)
-        #expect(store.state.returnNotice == nil)
+        #expect(store.state.ceremony?.injury?.notice.playerName == "Ada Keeper")
+        #expect(store.state.ceremony?.levelUp == nil)
+        #expect(store.state.ceremony?.returnNotice == nil)
     }
 
     @Test func aFinishedSeasonDropsUnreadReturns() throws {
@@ -391,7 +388,7 @@ struct CareerPersistenceTests {
         ]
         let week = MatchweekFeature.State(career: career)
         #expect(week.seasonIsOver)
-        #expect(week.returnNotice == nil)
+        #expect(week.ceremony == nil)
         #expect(week.career.returnNotices.isEmpty)
     }
 
@@ -408,8 +405,7 @@ struct CareerPersistenceTests {
         #expect(decoded.playedWeeks.first?.first?.homeScore == 2)
         let week = MatchweekFeature.State(career: decoded)
         #expect(week.playedWeeks.first?.first?.homeScore == 2)
-        #expect(week.skillChoice == nil)
-        #expect(week.injuryNotice == nil)
+        #expect(week.ceremony == nil)
         #expect(week.shownWeekIndex == 4)
 
         var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
