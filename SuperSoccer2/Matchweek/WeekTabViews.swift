@@ -455,8 +455,8 @@ struct MatchTab: View {
     private func placeLine(_ place: Int?) -> some View {
         if let place {
             Text("\(LeagueTable.placeWord(place)) in table")
-                .font(theme.type.captionNumber)
-                .foregroundStyle(theme.colors.secondaryText.color)
+                .font(theme.type.homeLine)
+                .foregroundStyle(theme.colors.text.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
