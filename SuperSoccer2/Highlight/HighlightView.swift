@@ -9,11 +9,8 @@ struct HighlightView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.space.md) {
             scoreboard
-            ZStack(alignment: .bottom) {
-                pitch
-                ticker
-                    .padding(theme.space.sm)
-            }
+            pitch
+            ticker
             if store.reduceMotion && (store.phase == .incoming || store.phase == .shown) {
                 Button {
                     store.send(.view(.advance))

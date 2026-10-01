@@ -190,11 +190,43 @@ struct HighlightScriptTests {
         )
         #expect(anchor.distance(to: expected) < 0.000_001)
         #expect(script.ballAnchor(ballProgress: 1, playerProgress: 0.4).distance(to: script.ballEnd) < 0.000_001)
+        for step in 0...8 {
+            let progress = Double(step) / 8
+            let drawn = script.places(ballProgress: progress, playerProgress: progress)
+            let pose = script.pose(at: progress)
+            for place in drawn {
+                let expected = pose.places.first { $0.id == place.id }
+                #expect(expected?.point.distance(to: place.point) ?? 1 < 0.000_001)
+            }
+        }
         for step in 0...10 {
             let progress = Double(step) / 10
             let drawn = script.ballAnchor(ballProgress: progress, playerProgress: progress)
             #expect(drawn.distance(to: script.pose(at: progress).ball) < 0.000_001)
         }
+    }
+
+    @Test func theReceiverMeetsThePass() throws {
+        let script = HighlightScript.make(shot: highlightShot(result: .goal, passer: true), matchSeed: 42)
+        let passIndex = try #require(script.beats.firstIndex { $0.kind == .pass })
+        let pass = script.beats[passIndex]
+        let total = script.beats.reduce(0) { $0 + $1.weight }
+        let prefix = script.beats.prefix(passIndex).reduce(0) { $0 + $1.weight }
+        let start = prefix / total
+        let end = (prefix + pass.weight) / total
+        let receiver = try #require(pass.moves.first { $0.end.distance(to: pass.ballEnd) < 0.000_001 })
+        let ratio = 0.65
+        let arrived = script.places(ballProgress: end, playerProgress: end * ratio)
+        let reception = try #require(arrived.first { $0.id == receiver.actorID })
+        #expect(reception.point.distance(to: pass.ballEnd) < 0.000_001)
+        let slow = script.pose(at: end * ratio).places.first { $0.id == receiver.actorID }
+        #expect((slow?.point.distance(to: pass.ballEnd) ?? 0) > 0.02)
+
+        let kicked = start + (end - start) * 0.01
+        let atKick = script.places(ballProgress: kicked, playerProgress: kicked * ratio)
+        let runner = try #require(atKick.first { $0.id == receiver.actorID })
+        let behind = script.pose(at: start * ratio).places.first { $0.id == receiver.actorID }
+        #expect(runner.point.distance(to: behind?.point ?? pass.ballEnd) < 0.05)
     }
 
     @Test @MainActor func thePlayerTokenShirtTakesTheKitColor() throws {

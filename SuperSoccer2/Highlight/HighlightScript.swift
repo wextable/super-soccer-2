@@ -179,6 +179,19 @@ struct HighlightScript: Equatable, Sendable {
         return interpolated(placed.beat, portion: placed.portion)
     }
 
+    /// Players on the slow clock, except the player the ball is going to. A pass receiver
+    /// runs onto the ball and is there when it arrives, and the shooter stays with the strike.
+    func places(ballProgress: Double, playerProgress: Double) -> [HighlightPlace] {
+        pose(at: playerProgress).places.map { place in
+            HighlightPlace(
+                id: place.id,
+                point: tracked(place.id, ballProgress: ballProgress, playerProgress: playerProgress),
+                role: place.role,
+                attacks: place.attacks
+            )
+        }
+    }
+
     /// Where the ball is drawn. Passes and shots follow `ballProgress`. A dribble stays with the
     /// slower player clock instead of racing ahead of the circle.
     func ballAnchor(ballProgress: Double, playerProgress: Double) -> PitchPoint {
@@ -198,6 +211,41 @@ struct HighlightScript: Equatable, Sendable {
 
     func move(for actor: Int, at progress: Double) -> HighlightMove? {
         placement(at: progress).beat.moves.first { $0.actorID == actor }
+    }
+
+    /// Where one player is drawn. A receiver who would still be short of the pass is run forward so they meet it.
+    private func tracked(_ id: Int, ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        let ratio = ballProgress > 0.000_001 ? playerProgress / ballProgress : 1
+        var progress = playerProgress
+        for index in beats.indices {
+            let beat = beats[index]
+            let span = beatSpan(index)
+            let keepsUp = (beat.kind == .pass && receiver(of: beat) == id)
+                || (beat.kind == .shot && beat.ballOwner == id)
+            guard keepsUp, ballProgress > span.start else { continue }
+            if ballProgress >= span.end {
+                progress = max(progress, span.end)
+                continue
+            }
+            if progress >= span.start {
+                progress = max(progress, ballProgress)
+                continue
+            }
+            let from = pose(at: min(span.start * ratio, span.start)).places.first { $0.id == id }?.point
+            let to = beat.moves.first { $0.actorID == id }?.end
+            guard let from, let to else { continue }
+            let length = span.end - span.start
+            let portion = length <= 0 ? 1 : min(1, (ballProgress - span.start) / length)
+            return lerp(from, to, portion)
+        }
+        return pose(at: min(max(progress, 0), 1)).places.first { $0.id == id }?.point
+            ?? PitchPoint(x: 0.5, y: 0.5)
+    }
+
+    private func receiver(of beat: HighlightBeat) -> Int? {
+        guard beat.kind == .pass else { return nil }
+        let arrived = beat.moves.filter { $0.end.distance(to: beat.ballEnd) < 0.000_001 }
+        return arrived.first { $0.actorID != beat.ballOwner }?.actorID ?? arrived.first?.actorID
     }
 
     private struct Placement {

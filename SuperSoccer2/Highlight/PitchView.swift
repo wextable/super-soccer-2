@@ -51,7 +51,7 @@ struct PitchView: View {
     }
 
     private func field(ballProgress: Double, playerProgress: Double) -> some View {
-        let players = script?.pose(at: playerProgress)
+        let players = script?.places(ballProgress: ballProgress, playerProgress: playerProgress)
         return Color.clear
             .aspectRatio(0.72, contentMode: .fit)
             .overlay {
@@ -74,7 +74,7 @@ struct PitchView: View {
                             .position(x: size.width * 0.5, y: size.height * (goalAtBottom ? 0.92 : 0.08))
                         goal(in: size)
                         if let script, let players {
-                            ForEach(players.places) { place in
+                            ForEach(players) { place in
                                 token(
                                     at: point(place.point, in: size),
                                     shirt: place.attacks ? attacking : defending,
@@ -156,7 +156,8 @@ struct PitchView: View {
         let anchor = script.ballAnchor(ballProgress: ballProgress, playerProgress: playerProgress)
         let ball = point(anchor, in: size)
         let ownerID = script.ballOwner(at: ballProgress)
-        guard let owner = script.pose(at: playerProgress).places.first(where: { $0.id == ownerID }) else {
+        guard let owner = script.places(ballProgress: ballProgress, playerProgress: playerProgress)
+            .first(where: { $0.id == ownerID }) else {
             return ball
         }
         let player = point(owner.point, in: size)
