@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import SuperSoccer2
 
 @Suite
@@ -103,7 +104,7 @@ struct HighlightScriptTests {
             finishes.insert(script.finish)
             #expect(script.finish == .wide || script.finish == .over)
             #expect(script.ballEndsInNet == false)
-            #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.goalHalfWidth)
+            #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.displayGoalHalfWidth)
             #expect(script.ballEnd.distance(to: keeperEnd(script)) > 0.001)
         }
         #expect(finishes.contains(.wide))
@@ -148,7 +149,7 @@ struct HighlightScriptTests {
         #expect(opening != after)
         expectMirrored(opening, after)
         #expect(opening.ballEnd.inAttackingView(of: opening.attackingEnd).y == 1)
-        #expect(after.ballEnd.inAttackingView(of: after.attackingEnd).y == 1)
+        #expect(after.ballEnd.inAttackingView(of: after.attackingEnd).y == 0)
 
         var away = first
         away.isHome = false
@@ -158,16 +159,18 @@ struct HighlightScriptTests {
         let awaySecond = HighlightScript.make(shot: awayLater, matchSeed: 11)
         #expect(awayFirst.attackingEnd == .south)
         #expect(awaySecond.attackingEnd == .north)
+        #expect(awayFirst.ballEnd.inAttackingView(of: awayFirst.attackingEnd).y == 0)
+        #expect(awaySecond.ballEnd.inAttackingView(of: awaySecond.attackingEnd).y == 1)
         expectMirrored(awaySecond, awayFirst)
     }
 
-    @Test func theAttackingGoalSitsAtTheBottom() {
-        let view = PitchPoint(x: 0.2, y: 0).inAttackingView(of: .north)
-        #expect(view.y == 1)
-        #expect(abs(view.x - 0.8) < 0.000_001)
+    @Test func possessionPicksTheEndOfTheScreen() {
+        let north = PitchPoint(x: 0.2, y: 0).inAttackingView(of: .north)
+        #expect(north.y == 1)
+        #expect(abs(north.x - 0.2) < 0.000_001)
         let south = PitchPoint(x: 0.2, y: 1).inAttackingView(of: .south)
-        #expect(south.y == 1)
-        #expect(abs(south.x - 0.8) < 0.000_001)
+        #expect(south.y == 0)
+        #expect(abs(south.x - 0.2) < 0.000_001)
     }
 
     @Test func theDribbleStaysWithTheSlowerPlayer() {
@@ -192,6 +195,18 @@ struct HighlightScriptTests {
             let drawn = script.ballAnchor(ballProgress: progress, playerProgress: progress)
             #expect(drawn.distance(to: script.pose(at: progress).ball) < 0.000_001)
         }
+    }
+
+    @Test @MainActor func thePlayerTokenShirtTakesTheKitColor() throws {
+        let image = try #require(PitchPlayerIcon.image(shirt: KitColor(red: 0, green: 0, blue: 1)))
+        let shirt = try #require(PitchPlayerIcon.sample(image, x: 12, y: 16))
+        #expect(shirt.red == 0)
+        #expect(shirt.green == 0)
+        #expect(shirt.blue == 255)
+        let hair = try #require(PitchPlayerIcon.sample(image, x: 32, y: 16))
+        #expect(hair.red == 108)
+        #expect(hair.green == 48)
+        #expect(hair.blue == 2)
     }
 }
 
@@ -288,7 +303,7 @@ private func expectPlausible(_ script: HighlightScript, shot: Shot, hasPasser: B
     case .miss:
         #expect(script.finish == .wide || script.finish == .over)
         #expect(script.ballEndsInNet == false)
-        #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.goalHalfWidth)
+        #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.displayGoalHalfWidth)
     }
 }
 

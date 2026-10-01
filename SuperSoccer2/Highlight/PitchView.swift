@@ -1,14 +1,15 @@
 import SwiftUI
 
-/// Flat grass, simple lines, colored circles, and the plain ball.
-/// The attacked goal is at the bottom. A local clock samples the script, because a store
-/// progress of 0 then 1 does not interpolate a computed point. Players take longer than the ball.
+/// Flat grass, simple lines, the old player tokens, and the plain ball.
+/// North is the bottom of the screen and south is the top, so the goal switches ends with possession.
+/// A local clock samples the script, because a store progress of 0 then 1 does not interpolate a computed point.
+/// Players take longer than the ball.
 struct PitchView: View {
     var script: HighlightScript?
     var progress: Double
     var attackingEnd: PitchEnd
-    var attacking: Color
-    var defending: Color
+    var attacking: KitColor
+    var defending: KitColor
     var minute: String
     /// True while the move should play from the start of the script to the end.
     var animated: Bool
@@ -70,14 +71,14 @@ struct PitchView: View {
                         RoundedRectangle(cornerRadius: theme.metrics.shadowRadius, style: .continuous)
                             .stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine)
                             .frame(width: size.width * 0.5, height: size.height * 0.16)
-                            .position(x: size.width * 0.5, y: size.height * 0.92)
+                            .position(x: size.width * 0.5, y: size.height * (goalAtBottom ? 0.92 : 0.08))
                         goal(in: size)
                         if let script, let players {
                             ForEach(players.places) { place in
-                                dot(
+                                token(
                                     at: point(place.point, in: size),
-                                    color: place.attacks ? attacking : defending,
-                                    diameter: size.width * 0.05
+                                    shirt: place.attacks ? attacking : defending,
+                                    in: size
                                 )
                             }
                             Circle()
@@ -108,21 +109,42 @@ struct PitchView: View {
             .accessibilityHidden(true)
     }
 
+    /// North is the bottom of the screen. South is the top.
+    private var goalAtBottom: Bool { attackingEnd == .north }
+
     private func goal(in size: CGSize) -> some View {
         let thickness = max(5, theme.metrics.pitchLine * 2.5)
         let inset = theme.metrics.pitchLine
+        let y = goalAtBottom
+            ? size.height - inset - thickness / 2
+            : inset + thickness / 2
         return Rectangle()
             .fill(theme.colors.pitchLine.color)
-            .frame(width: size.width * PitchGeometry.goalHalfWidth * 2, height: thickness)
-            .position(x: size.width * 0.5, y: size.height - inset - thickness / 2)
+            .frame(width: size.width * PitchGeometry.displayGoalHalfWidth * 2, height: thickness)
+            .position(x: size.width * 0.5, y: y)
     }
 
-    private func dot(at center: CGPoint, color: Color, diameter: CGFloat) -> some View {
-        Circle()
-            .fill(color)
-            .overlay(Circle().stroke(theme.colors.pitchLine.color, lineWidth: theme.metrics.pitchLine))
-            .frame(width: diameter, height: diameter)
-            .position(center)
+    private func token(at center: CGPoint, shirt: KitColor, in size: CGSize) -> some View {
+        let token = tokenSize(in: size)
+        let mark = PitchPlayerIcon.image(shirt: shirt)
+        return Group {
+            if let mark {
+                Image(uiImage: mark)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: token.width, height: token.height)
+            } else {
+                Circle()
+                    .fill(shirt.color)
+                    .frame(width: token.height, height: token.height)
+            }
+        }
+        .position(center)
+    }
+
+    private func tokenSize(in size: CGSize) -> CGSize {
+        let width = size.width * 0.09
+        return CGSize(width: width, height: width * 0.5)
     }
 
     private func ballPosition(
@@ -138,32 +160,40 @@ struct PitchView: View {
             return ball
         }
         let player = point(owner.point, in: size)
-        let playerRadius = size.width * 0.05 / 2
         let ballRadius = max(theme.metrics.ballMinimum, size.width * 0.035) / 2
-        let gap = playerRadius + ballRadius + theme.metrics.pitchLine
         let dx = ball.x - player.x
         let dy = ball.y - player.y
         let distance = hypot(dx, dy)
-        guard distance < gap else { return ball }
         let direction: CGPoint
         if distance > 1 {
             direction = CGPoint(x: dx / distance, y: dy / distance)
         } else {
             direction = facing(of: ownerID, in: script, at: playerProgress, size: size)
         }
+        let gap = tokenRadius(along: direction, in: size) + ballRadius + theme.metrics.pitchLine
+        guard distance < gap else { return ball }
         return CGPoint(x: player.x + direction.x * gap, y: player.y + direction.y * gap)
     }
 
+    /// Half the token, measured along the direction the ball is leaving.
+    private func tokenRadius(along direction: CGPoint, in size: CGSize) -> CGFloat {
+        let token = tokenSize(in: size)
+        let rx = token.width / 2
+        let ry = token.height / 2
+        let denom = hypot(ry * direction.x, rx * direction.y)
+        guard denom > 0.001 else { return rx }
+        return (rx * ry) / denom
+    }
+
     private func facing(of owner: Int, in script: HighlightScript, at progress: Double, size: CGSize) -> CGPoint {
-        guard let move = script.move(for: owner, at: progress) else {
-            return CGPoint(x: 0, y: 1)
-        }
+        let towardGoal = goalAtBottom ? CGPoint(x: 0, y: 1) : CGPoint(x: 0, y: -1)
+        guard let move = script.move(for: owner, at: progress) else { return towardGoal }
         let start = point(move.start, in: size)
         let end = point(move.end, in: size)
         let dx = end.x - start.x
         let dy = end.y - start.y
         let length = hypot(dx, dy)
-        guard length > 0.5 else { return CGPoint(x: 0, y: 1) }
+        guard length > 0.5 else { return towardGoal }
         return CGPoint(x: dx / length, y: dy / length)
     }
 

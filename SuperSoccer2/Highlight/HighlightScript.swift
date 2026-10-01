@@ -12,12 +12,18 @@ struct PitchPoint: Equatable, Sendable {
         return (dx * dx + dy * dy).squareRoot()
     }
 
-    /// Attacking-third camera, spun 180 degrees so the goal sits at the bottom.
-    /// x is mirrored and y is 1 on the goal line. The attack runs downward. Nothing animates the spin.
+    /// The attacking third on a pitch whose ends stay put for the whole match.
+    /// North (pitch y = 0) is the bottom of the screen. South (pitch y = 1) is the top.
+    /// First half, home defends south, so that goal is at the top and home shoots down at the other.
+    /// After the break the clubs swap ends, so home defends the bottom. Left stays left.
     func inAttackingView(of end: PitchEnd) -> PitchPoint {
         let depth = PitchGeometry.playDepth
-        let along = end == .north ? y / depth : (1 - y) / depth
-        return PitchPoint(x: 1 - x, y: 1 - along)
+        switch end {
+        case .north:
+            return PitchPoint(x: x, y: 1 - y / depth)
+        case .south:
+            return PitchPoint(x: x, y: (1 - y) / depth)
+        }
     }
 
     func isInNet(of end: PitchEnd) -> Bool {
@@ -63,6 +69,8 @@ enum PitchGeometry {
     static let cornerRadius = 1.0
 
     static var goalHalfWidth: Double { (goalWidth / width) / 2 }
+    /// The drawn goal is three times the real posts, so a shot reads on the pitch.
+    static var displayGoalHalfWidth: Double { goalHalfWidth * 3 }
     static var sixHalfWidth: Double { (sixWidth / width) / 2 }
     static var boxHalfWidth: Double { (boxWidth / width) / 2 }
     static var sixDepthLocal: Double { (sixLength / length) / playDepth }
@@ -476,10 +484,10 @@ private struct ScriptBuilder {
             let offset = 0.012 + unit() * 0.02
             return LocalPoint(x: 0.5 + side * offset, y: 0)
         case .wide:
-            let offset = PitchGeometry.goalHalfWidth + 0.07 + unit() * 0.08
+            let offset = PitchGeometry.displayGoalHalfWidth + 0.07 + unit() * 0.06
             return LocalPoint(x: 0.5 + side * offset, y: 0.02)
         case .over:
-            let offset = PitchGeometry.goalHalfWidth + 0.03 + unit() * 0.025
+            let offset = PitchGeometry.displayGoalHalfWidth + 0.03 + unit() * 0.02
             return LocalPoint(x: 0.5 + side * offset, y: 0.012)
         case .keeper:
             return clampKeeper(LocalPoint(x: 0.5 + side * (0.03 + unit() * 0.05), y: 0.045 + unit() * 0.04))

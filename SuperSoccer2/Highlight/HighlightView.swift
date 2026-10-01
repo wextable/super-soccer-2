@@ -51,8 +51,8 @@ struct HighlightView: View {
             script: store.script,
             progress: store.ballProgress,
             attackingEnd: store.attackingEnd,
-            attacking: attackingKit.primary.color,
-            defending: defendingKit.primary.color,
+            attacking: attackingKit.primary,
+            defending: defendingKit.primary,
             minute: store.minuteText,
             animated: store.sentenceVisible && !reduceMotion && store.phase == .shown
         )
