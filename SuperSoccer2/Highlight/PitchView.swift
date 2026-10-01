@@ -18,7 +18,8 @@ struct PitchView: View {
     @State private var playStart: Date?
 
     /// Fits inside the line hold so the final frame sits before the next shot.
-    private static let ballSeconds = 1.6
+    /// A goal celebration starts when this clock reaches the net.
+    private static let ballSeconds = GoalCelebrationTiming.ballSeconds
     /// A bit slower than the ball, and still finished before the line hold ends.
     private static let playerSeconds = 2.2
 

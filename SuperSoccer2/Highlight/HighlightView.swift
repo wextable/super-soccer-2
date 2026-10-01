@@ -53,6 +53,17 @@ struct HighlightView: View {
             minute: store.minuteText,
             animated: store.sentenceVisible && !reduceMotion && store.phase == .shown
         )
+        .overlay {
+            if let scorer = celebratingScorer {
+                GoalCelebration(
+                    name: scorer.fullName,
+                    face: scorer.face,
+                    position: scorer.position,
+                    clubID: store.attackingIsHome ? store.homeID : store.awayID,
+                    animated: !reduceMotion
+                )
+            }
+        }
     }
 
     private var scoreboard: some View {
@@ -108,6 +119,14 @@ struct HighlightView: View {
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
             .accessibilityLabel(store.commentary)
             .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
+    }
+
+    /// The scorer, once the goal is on the board. The card sits on the pitch, not the ticker.
+    private var celebratingScorer: Player? {
+        guard store.phase == .shown, store.result == .goal, store.shots.indices.contains(store.index) else {
+            return nil
+        }
+        return store.shots[store.index].shooter
     }
 
     private var attackingKit: Kit {

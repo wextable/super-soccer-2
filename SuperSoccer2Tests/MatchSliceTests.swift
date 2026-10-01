@@ -268,7 +268,7 @@ struct HighlightFeatureTests {
             $0.homeScore = 1
         }
 
-        await clock.advance(by: HighlightFeature.lineDuration)
+        await clock.advance(by: HighlightFeature.goalShownDuration)
         await store.receive(\.view.advance) {
             $0.index = 2
             $0.phase = .incoming
@@ -291,7 +291,7 @@ struct HighlightFeatureTests {
             $0.awayScore = 1
         }
 
-        await clock.advance(by: HighlightFeature.lineDuration)
+        await clock.advance(by: HighlightFeature.goalShownDuration)
         await store.receive(\.view.advance) {
             $0.phase = .halfTime
             $0.commentary = "Half time."
@@ -311,6 +311,16 @@ struct HighlightFeatureTests {
         #expect(store.state.homeScore == store.state.finalHomeScore)
         #expect(store.state.awayScore == store.state.finalAwayScore)
         #expect(store.state.index == 2)
+    }
+
+    @Test func aGoalHoldsThroughTheScorersCard() {
+        #expect(GoalCelebrationTiming.shownMilliseconds == 6_350)
+        #expect(HighlightFeature.goalShownDuration == .milliseconds(6_350))
+        #expect(HighlightFeature.goalShownDuration > HighlightFeature.lineDuration)
+        #expect(GoalPop.scale(seconds: 0) == 0)
+        let peak = stride(from: 0.0, through: 1.25, by: 0.01).map { GoalPop.scale(seconds: $0) }.max() ?? 0
+        #expect(peak > 1.2)
+        #expect(abs(GoalPop.scale(seconds: 1.25) - 1) < 0.05)
     }
 
     @Test func reduceMotionShowsTheLineImmediately() async {
@@ -488,7 +498,7 @@ struct HighlightFeatureTests {
             $0.sentenceVisible = true
             $0.homeScore = 1
         }
-        await clock.advance(by: HighlightFeature.lineDuration)
+        await clock.advance(by: HighlightFeature.goalShownDuration)
         await store.receive(\.view.advance) {
             $0.phase = .halfTime
             $0.commentary = "Half time."
