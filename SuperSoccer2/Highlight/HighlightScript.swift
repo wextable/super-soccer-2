@@ -12,11 +12,12 @@ struct PitchPoint: Equatable, Sendable {
         return (dx * dx + dy * dy).squareRoot()
     }
 
-    /// The attacking-third camera. The goal being attacked sits at y = 0, the top of the view.
+    /// Attacking-third camera, spun 180 degrees so the goal sits at the bottom.
+    /// x is mirrored and y is 1 on the goal line. The attack runs downward. Nothing animates the spin.
     func inAttackingView(of end: PitchEnd) -> PitchPoint {
         let depth = PitchGeometry.playDepth
-        let y = end == .north ? self.y / depth : (1 - self.y) / depth
-        return PitchPoint(x: x, y: y)
+        let along = end == .north ? y / depth : (1 - y) / depth
+        return PitchPoint(x: 1 - x, y: 1 - along)
     }
 
     func isInNet(of end: PitchEnd) -> Bool {
@@ -121,6 +122,8 @@ struct HighlightBeat: Equatable, Sendable {
     var kind: Kind
     /// Relative length. The reel plays the beats across one window.
     var weight: Double
+    /// The player the ball leaves. A carry stays with them. A pass or shot is played by them.
+    var ballOwner: Int
     var ballStart: PitchPoint
     var ballEnd: PitchPoint
     var moves: [HighlightMove]
@@ -164,6 +167,38 @@ struct HighlightScript: Equatable, Sendable {
     }
 
     func pose(at progress: Double) -> HighlightPose {
+        let placed = placement(at: progress)
+        return interpolated(placed.beat, portion: placed.portion)
+    }
+
+    /// Where the ball is drawn. Passes and shots follow `ballProgress`. A dribble stays with the
+    /// slower player clock instead of racing ahead of the circle.
+    func ballAnchor(ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        let ball = placement(at: ballProgress)
+        switch ball.beat.kind {
+        case .carry:
+            return carryPoint(ball.beat, index: ball.index, progress: playerProgress)
+        case .pass, .shot:
+            let start = releasePoint(before: ball.index, ballProgress: ballProgress, playerProgress: playerProgress)
+            return lerp(start, ball.beat.ballEnd, ball.portion)
+        }
+    }
+
+    func ballOwner(at progress: Double) -> Int {
+        placement(at: progress).beat.ballOwner
+    }
+
+    func move(for actor: Int, at progress: Double) -> HighlightMove? {
+        placement(at: progress).beat.moves.first { $0.actorID == actor }
+    }
+
+    private struct Placement {
+        var beat: HighlightBeat
+        var portion: Double
+        var index: Int
+    }
+
+    private func placement(at progress: Double) -> Placement {
         let clamped = min(max(progress, 0), 1)
         let total = beats.reduce(0) { $0 + $1.weight }
         var remaining = clamped * total
@@ -171,11 +206,45 @@ struct HighlightScript: Equatable, Sendable {
             let last = index == beats.count - 1
             if remaining <= beat.weight || last {
                 let portion = beat.weight <= 0 ? 1 : min(1, remaining / beat.weight)
-                return interpolated(beat, portion: last && remaining > beat.weight ? 1 : portion)
+                return Placement(beat: beat, portion: portion, index: index)
             }
             remaining -= beat.weight
         }
-        return interpolated(beats[beats.count - 1], portion: 1)
+        let last = beats.count - 1
+        return Placement(beat: beats[last], portion: 1, index: last)
+    }
+
+    /// Player progress along a carry. Before they arrive, the ball waits at the start of the beat.
+    private func carryPoint(_ beat: HighlightBeat, index: Int, progress: Double) -> PitchPoint {
+        let span = beatSpan(index)
+        if progress <= span.start { return beat.ballStart }
+        if progress >= span.end { return beat.ballEnd }
+        let length = span.end - span.start
+        let portion = length <= 0 ? 1 : (progress - span.start) / length
+        return lerp(beat.ballStart, beat.ballEnd, portion)
+    }
+
+    /// Where a pass or shot is struck from. A dribble releases from the slower player, not from the end of the scripted run.
+    private func releasePoint(before index: Int, ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        guard index > 0 else { return beats[0].ballStart }
+        let previous = beats[index - 1]
+        switch previous.kind {
+        case .carry:
+            let ratio = ballProgress > 0 ? playerProgress / ballProgress : 1
+            let span = beatSpan(index - 1)
+            return carryPoint(previous, index: index - 1, progress: span.end * ratio)
+        case .pass, .shot:
+            return previous.ballEnd
+        }
+    }
+
+    private func beatSpan(_ index: Int) -> (start: Double, end: Double) {
+        let total = beats.reduce(0) { $0 + $1.weight }
+        guard total > 0 else { return (0, 1) }
+        let prefix = beats.prefix(index).reduce(0) { $0 + $1.weight }
+        let start = prefix / total
+        let end = index == beats.count - 1 ? 1 : (prefix + beats[index].weight) / total
+        return (start, end)
     }
 
     private func interpolated(_ beat: HighlightBeat, portion: Double) -> HighlightPose {
@@ -407,10 +476,11 @@ private struct ScriptBuilder {
             let offset = 0.012 + unit() * 0.02
             return LocalPoint(x: 0.5 + side * offset, y: 0)
         case .wide:
-            let offset = 0.12 + unit() * 0.08
+            let offset = PitchGeometry.goalHalfWidth + 0.07 + unit() * 0.08
             return LocalPoint(x: 0.5 + side * offset, y: 0.02)
         case .over:
-            return LocalPoint(x: 0.5 + side * unit() * 0.03, y: 0.028)
+            let offset = PitchGeometry.goalHalfWidth + 0.03 + unit() * 0.025
+            return LocalPoint(x: 0.5 + side * offset, y: 0.012)
         case .keeper:
             return clampKeeper(LocalPoint(x: 0.5 + side * (0.03 + unit() * 0.05), y: 0.045 + unit() * 0.04))
         }
@@ -464,6 +534,7 @@ private struct ScriptBuilder {
             HighlightBeat(
                 kind: kind,
                 weight: weight,
+                ballOwner: owner,
                 ballStart: absolute(ballStart),
                 ballEnd: absolute(ballEnd),
                 moves: moves

@@ -37,7 +37,7 @@ struct HighlightFeature {
         var matchSeed: UInt64
         var script: HighlightScript?
         var attackingEnd: PitchEnd
-        /// Increments when the attacked goal changes, so the view can flip.
+        /// Increments when the attacked goal changes. The pitch swaps ends in place.
         var cameraFlip: Int
         /// Set once the half-time pause has been passed. The second half does not play the first again.
         var halfTimePassed: Bool

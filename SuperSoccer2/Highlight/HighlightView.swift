@@ -5,7 +5,6 @@ struct HighlightView: View {
     @Bindable var store: StoreOf<HighlightFeature>
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var squashed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.space.md) {
@@ -45,14 +44,6 @@ struct HighlightView: View {
         .onAppear {
             store.send(.view(.onAppear(reduceMotion: reduceMotion)))
         }
-        .onChange(of: store.cameraFlip) { _, _ in
-            guard !reduceMotion else { return }
-            squashed = true
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(180))
-                squashed = false
-            }
-        }
     }
 
     private var pitch: some View {
@@ -65,13 +56,6 @@ struct HighlightView: View {
             minute: store.minuteText,
             animated: store.sentenceVisible && !reduceMotion && store.phase == .shown
         )
-        .scaleEffect(y: squashed ? 0.08 : 1, anchor: .center)
-        .rotation3DEffect(
-            .degrees(squashed ? 75 : 0),
-            axis: (x: 1, y: 0, z: 0),
-            perspective: 0.5
-        )
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: squashed)
     }
 
     private var scoreboard: some View {

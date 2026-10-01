@@ -103,6 +103,7 @@ struct HighlightScriptTests {
             finishes.insert(script.finish)
             #expect(script.finish == .wide || script.finish == .over)
             #expect(script.ballEndsInNet == false)
+            #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.goalHalfWidth)
             #expect(script.ballEnd.distance(to: keeperEnd(script)) > 0.001)
         }
         #expect(finishes.contains(.wide))
@@ -146,8 +147,8 @@ struct HighlightScriptTests {
         #expect(after.attackingEnd == .south)
         #expect(opening != after)
         expectMirrored(opening, after)
-        #expect(opening.ballEnd.inAttackingView(of: opening.attackingEnd).y == 0)
-        #expect(after.ballEnd.inAttackingView(of: after.attackingEnd).y == 0)
+        #expect(opening.ballEnd.inAttackingView(of: opening.attackingEnd).y == 1)
+        #expect(after.ballEnd.inAttackingView(of: after.attackingEnd).y == 1)
 
         var away = first
         away.isHome = false
@@ -158,6 +159,39 @@ struct HighlightScriptTests {
         #expect(awayFirst.attackingEnd == .south)
         #expect(awaySecond.attackingEnd == .north)
         expectMirrored(awaySecond, awayFirst)
+    }
+
+    @Test func theAttackingGoalSitsAtTheBottom() {
+        let view = PitchPoint(x: 0.2, y: 0).inAttackingView(of: .north)
+        #expect(view.y == 1)
+        #expect(abs(view.x - 0.8) < 0.000_001)
+        let south = PitchPoint(x: 0.2, y: 1).inAttackingView(of: .south)
+        #expect(south.y == 1)
+        #expect(abs(south.x - 0.8) < 0.000_001)
+    }
+
+    @Test func theDribbleStaysWithTheSlowerPlayer() {
+        let script = HighlightScript.make(
+            shot: highlightShot(result: .goal, type: .penalty, passer: false),
+            matchSeed: 3
+        )
+        let carry = script.beats[0]
+        #expect(carry.kind == .carry)
+        let total = script.beats.reduce(0) { $0 + $1.weight }
+        let carryEnd = carry.weight / total
+        let playerProgress = carryEnd * 0.35
+        let anchor = script.ballAnchor(ballProgress: carryEnd * 0.8, playerProgress: playerProgress)
+        let expected = PitchPoint(
+            x: carry.ballStart.x + (carry.ballEnd.x - carry.ballStart.x) * 0.35,
+            y: carry.ballStart.y + (carry.ballEnd.y - carry.ballStart.y) * 0.35
+        )
+        #expect(anchor.distance(to: expected) < 0.000_001)
+        #expect(script.ballAnchor(ballProgress: 1, playerProgress: 0.4).distance(to: script.ballEnd) < 0.000_001)
+        for step in 0...10 {
+            let progress = Double(step) / 10
+            let drawn = script.ballAnchor(ballProgress: progress, playerProgress: progress)
+            #expect(drawn.distance(to: script.pose(at: progress).ball) < 0.000_001)
+        }
     }
 }
 
@@ -254,6 +288,7 @@ private func expectPlausible(_ script: HighlightScript, shot: Shot, hasPasser: B
     case .miss:
         #expect(script.finish == .wide || script.finish == .over)
         #expect(script.ballEndsInNet == false)
+        #expect(abs(script.ballEnd.x - 0.5) > PitchGeometry.goalHalfWidth)
     }
 }
 
