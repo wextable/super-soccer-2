@@ -291,15 +291,20 @@ struct HighlightFeature {
         }
     }
 
-    enum CancelID { case beat }
+    enum CancelID {
+        case beat
+        case crowd
+        case crowdBed
+    }
 
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.crowdSound) var crowdSound
 
     var body: some ReducerOf<Self> {
         Reduce<State, Action> { state, action in
             switch action {
             case let .view(.onAppear(reduceMotion)):
-                guard !state.hasAppeared else { return .none }
+                guard !state.hasAppeared else { return resumeCrowd(state) }
                 state.hasAppeared = true
                 state.reduceMotion = reduceMotion
                 if state.phase == .halfTime {
@@ -308,20 +313,29 @@ struct HighlightFeature {
                 guard state.phase != .fullTime else { return .none }
                 if reduceMotion {
                     state.revealCurrent()
-                    return .none
+                    return openCrowd(answer: state.result)
                 }
-                return scheduleBeat(for: state.phase, state: state)
+                return .merge(
+                    openCrowd(answer: nil),
+                    scheduleBeat(for: state.phase, state: state)
+                )
 
             case .view(.advance):
                 guard state.phase != .fullTime, state.phase != .halfTime else { return .none }
                 if state.reduceMotion {
                     let move = state.showNextResult()
-                    return effect(for: move, state: state)
+                    return .merge(
+                        effect(for: move, state: state),
+                        state.phase == .shown ? react(state.result, after: .zero) : .none
+                    )
                 }
                 switch state.phase {
                 case .incoming:
                     state.revealCurrent()
-                    return scheduleBeat(for: state.phase, state: state)
+                    return .merge(
+                        scheduleBeat(for: state.phase, state: state),
+                        react(state.result, after: reactionDelay(state))
+                    )
                 case .shown:
                     let move = state.moveOn(revealing: false)
                     return effect(for: move, state: state)
@@ -332,25 +346,26 @@ struct HighlightFeature {
             case .view(.skipButtonTapped):
                 guard state.phase != .fullTime else { return .none }
                 state.finishReel()
-                return .cancel(id: CancelID.beat)
+                return .merge(
+                    .cancel(id: CancelID.beat),
+                    .cancel(id: CancelID.crowd)
+                )
 
             case .view(.statsButtonTapped):
                 guard state.phase == .fullTime else { return .none }
-                return .merge(
-                    .cancel(id: CancelID.beat),
-                    .send(.delegate(.showStats))
-                )
+                return leaveCrowd(then: .send(.delegate(.showStats)))
 
             case .view(.backButtonTapped):
-                return .merge(
-                    .cancel(id: CancelID.beat),
-                    .send(.delegate(.dismissed))
-                )
+                return leaveCrowd(then: .send(.delegate(.dismissed)))
 
             case .view(.secondHalfStarted):
                 guard state.phase == .halfTime else { return .none }
                 let move = state.beginSecondHalf()
-                return effect(for: move, state: state)
+                let answer = state.phase == .shown ? state.result : nil
+                return .merge(
+                    effect(for: move, state: state),
+                    openCrowd(answer: answer)
+                )
 
             case .delegate:
                 return .none
@@ -361,15 +376,76 @@ struct HighlightFeature {
     private func effect(for move: State.Move, state: State) -> Effect<Action> {
         switch move {
         case .halfTime:
-            return .merge(
-                .cancel(id: CancelID.beat),
-                .send(.delegate(.showHalfTime))
-            )
+            return leaveCrowd(then: .send(.delegate(.showHalfTime)))
         case .shot:
             guard !state.reduceMotion, state.phase == .incoming else { return .none }
             return scheduleBeat(for: .incoming, state: state)
         case .fullTime, .waiting:
-            return .cancel(id: CancelID.beat)
+            return .merge(
+                .cancel(id: CancelID.beat),
+                .cancel(id: CancelID.crowd)
+            )
+        }
+    }
+
+    /// Quiet bed under the reel. A reduced-motion result answers at once, because the ball does not travel.
+    private func openCrowd(answer: ShotResult?) -> Effect<Action> {
+        .run { [crowdSound] _ in
+            await crowdSound.prepare()
+            do {
+                try Task.checkCancellation()
+                await crowdSound.play(.ambient)
+                if let answer {
+                    try Task.checkCancellation()
+                    await crowdSound.play(CrowdMoment(answer))
+                }
+            } catch is CancellationError {
+                return
+            }
+        }
+        .cancellable(id: CancelID.crowdBed, cancelInFlight: true)
+    }
+
+    /// Drops a reaction that has not started and silences the bed. The reel's own action follows.
+    private func leaveCrowd(then next: Effect<Action>) -> Effect<Action> {
+        .concatenate(
+            .merge(
+                .cancel(id: CancelID.beat),
+                .cancel(id: CancelID.crowd),
+                .cancel(id: CancelID.crowdBed)
+            ),
+            stopCrowd(),
+            next
+        )
+    }
+
+    /// The roar or the groan once the ball has arrived. The bed keeps looping under it.
+    private func react(_ result: ShotResult, after delay: Duration) -> Effect<Action> {
+        .run { [clock, crowdSound] _ in
+            do {
+                if delay > .zero {
+                    try await clock.sleep(for: delay)
+                }
+                await crowdSound.play(CrowdMoment(result))
+            } catch is CancellationError {
+                return
+            }
+        }
+        .cancellable(id: CancelID.crowd, cancelInFlight: true)
+    }
+
+    private func reactionDelay(_ state: State) -> Duration {
+        state.reduceMotion ? .zero : .milliseconds(GoalCelebrationTiming.ballMilliseconds)
+    }
+
+    private func resumeCrowd(_ state: State) -> Effect<Action> {
+        guard state.phase == .incoming || state.phase == .shown else { return .none }
+        return openCrowd(answer: nil)
+    }
+
+    private func stopCrowd() -> Effect<Action> {
+        .run { [crowdSound] _ in
+            await crowdSound.stop()
         }
     }
 

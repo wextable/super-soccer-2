@@ -624,6 +624,7 @@ struct MatchweekFeature {
 
     @Dependency(\.entropy) var entropy
     @Dependency(\.careerStore) var careerStore
+    @Dependency(\.crowdSound) var crowdSound
 
     var body: some ReducerOf<Self> {
         Reduce(self.reduce)
@@ -665,7 +666,7 @@ struct MatchweekFeature {
                     home: pending.home,
                     away: pending.away
                 )
-                return .none
+                return prepareCrowd()
 
             case .view(.simulateMatchButtonTapped):
                 guard !state.currentWeekIsInTheTable else { return .none }
@@ -706,7 +707,7 @@ struct MatchweekFeature {
                     home: pending.home,
                     away: pending.away
                 )
-                return .none
+                return prepareCrowd()
 
             case .view(.nextFixtureButtonTapped):
                 guard state.hasNextFixture, state.ceremony == nil else { return .none }
@@ -887,6 +888,13 @@ struct MatchweekFeature {
             case .stats, .leaders, .championship, .team, .player, .substitution:
                 return .none
             }
+    }
+
+    /// Loads the crowd before the reel appears, so the first chance does not hitch.
+    private func prepareCrowd() -> Effect<Action> {
+        .run { [crowdSound] _ in
+            await crowdSound.prepare()
+        }
     }
 
     private func ensurePending(_ state: inout State) -> Bool {
