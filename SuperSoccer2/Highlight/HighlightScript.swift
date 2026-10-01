@@ -12,11 +12,18 @@ struct PitchPoint: Equatable, Sendable {
         return (dx * dx + dy * dy).squareRoot()
     }
 
-    /// The attacking-third camera. The goal being attacked sits at y = 0, the top of the view.
+    /// The attacking third on a pitch whose ends stay put for the whole match.
+    /// North (pitch y = 0) is the bottom of the screen. South (pitch y = 1) is the top.
+    /// First half, home defends south, so that goal is at the top and home shoots down at the other.
+    /// After the break the clubs swap ends, so home defends the bottom. Left stays left.
     func inAttackingView(of end: PitchEnd) -> PitchPoint {
         let depth = PitchGeometry.playDepth
-        let y = end == .north ? self.y / depth : (1 - self.y) / depth
-        return PitchPoint(x: x, y: y)
+        switch end {
+        case .north:
+            return PitchPoint(x: x, y: 1 - y / depth)
+        case .south:
+            return PitchPoint(x: x, y: (1 - y) / depth)
+        }
     }
 
     func isInNet(of end: PitchEnd) -> Bool {
@@ -62,6 +69,8 @@ enum PitchGeometry {
     static let cornerRadius = 1.0
 
     static var goalHalfWidth: Double { (goalWidth / width) / 2 }
+    /// The drawn goal is three times the real posts, so a shot reads on the pitch.
+    static var displayGoalHalfWidth: Double { goalHalfWidth * 3 }
     static var sixHalfWidth: Double { (sixWidth / width) / 2 }
     static var boxHalfWidth: Double { (boxWidth / width) / 2 }
     static var sixDepthLocal: Double { (sixLength / length) / playDepth }
@@ -121,6 +130,8 @@ struct HighlightBeat: Equatable, Sendable {
     var kind: Kind
     /// Relative length. The reel plays the beats across one window.
     var weight: Double
+    /// The player the ball leaves. A carry stays with them. A pass or shot is played by them.
+    var ballOwner: Int
     var ballStart: PitchPoint
     var ballEnd: PitchPoint
     var moves: [HighlightMove]
@@ -164,6 +175,86 @@ struct HighlightScript: Equatable, Sendable {
     }
 
     func pose(at progress: Double) -> HighlightPose {
+        let placed = placement(at: progress)
+        return interpolated(placed.beat, portion: placed.portion)
+    }
+
+    /// Players on the slow clock, except the player the ball is going to. A pass receiver
+    /// runs onto the ball and is there when it arrives, and the shooter stays with the strike.
+    func places(ballProgress: Double, playerProgress: Double) -> [HighlightPlace] {
+        pose(at: playerProgress).places.map { place in
+            HighlightPlace(
+                id: place.id,
+                point: tracked(place.id, ballProgress: ballProgress, playerProgress: playerProgress),
+                role: place.role,
+                attacks: place.attacks
+            )
+        }
+    }
+
+    /// Where the ball is drawn. Passes and shots follow `ballProgress`. A dribble stays with the
+    /// slower player clock instead of racing ahead of the circle.
+    func ballAnchor(ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        let ball = placement(at: ballProgress)
+        switch ball.beat.kind {
+        case .carry:
+            return carryPoint(ball.beat, index: ball.index, progress: playerProgress)
+        case .pass, .shot:
+            let start = releasePoint(before: ball.index, ballProgress: ballProgress, playerProgress: playerProgress)
+            return lerp(start, ball.beat.ballEnd, ball.portion)
+        }
+    }
+
+    func ballOwner(at progress: Double) -> Int {
+        placement(at: progress).beat.ballOwner
+    }
+
+    func move(for actor: Int, at progress: Double) -> HighlightMove? {
+        placement(at: progress).beat.moves.first { $0.actorID == actor }
+    }
+
+    /// Where one player is drawn. A receiver who would still be short of the pass is run forward so they meet it.
+    private func tracked(_ id: Int, ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        let ratio = ballProgress > 0.000_001 ? playerProgress / ballProgress : 1
+        var progress = playerProgress
+        for index in beats.indices {
+            let beat = beats[index]
+            let span = beatSpan(index)
+            let keepsUp = (beat.kind == .pass && receiver(of: beat) == id)
+                || (beat.kind == .shot && beat.ballOwner == id)
+            guard keepsUp, ballProgress > span.start else { continue }
+            if ballProgress >= span.end {
+                progress = max(progress, span.end)
+                continue
+            }
+            if progress >= span.start {
+                progress = max(progress, ballProgress)
+                continue
+            }
+            let from = pose(at: min(span.start * ratio, span.start)).places.first { $0.id == id }?.point
+            let to = beat.moves.first { $0.actorID == id }?.end
+            guard let from, let to else { continue }
+            let length = span.end - span.start
+            let portion = length <= 0 ? 1 : min(1, (ballProgress - span.start) / length)
+            return lerp(from, to, portion)
+        }
+        return pose(at: min(max(progress, 0), 1)).places.first { $0.id == id }?.point
+            ?? PitchPoint(x: 0.5, y: 0.5)
+    }
+
+    private func receiver(of beat: HighlightBeat) -> Int? {
+        guard beat.kind == .pass else { return nil }
+        let arrived = beat.moves.filter { $0.end.distance(to: beat.ballEnd) < 0.000_001 }
+        return arrived.first { $0.actorID != beat.ballOwner }?.actorID ?? arrived.first?.actorID
+    }
+
+    private struct Placement {
+        var beat: HighlightBeat
+        var portion: Double
+        var index: Int
+    }
+
+    private func placement(at progress: Double) -> Placement {
         let clamped = min(max(progress, 0), 1)
         let total = beats.reduce(0) { $0 + $1.weight }
         var remaining = clamped * total
@@ -171,11 +262,45 @@ struct HighlightScript: Equatable, Sendable {
             let last = index == beats.count - 1
             if remaining <= beat.weight || last {
                 let portion = beat.weight <= 0 ? 1 : min(1, remaining / beat.weight)
-                return interpolated(beat, portion: last && remaining > beat.weight ? 1 : portion)
+                return Placement(beat: beat, portion: portion, index: index)
             }
             remaining -= beat.weight
         }
-        return interpolated(beats[beats.count - 1], portion: 1)
+        let last = beats.count - 1
+        return Placement(beat: beats[last], portion: 1, index: last)
+    }
+
+    /// Player progress along a carry. Before they arrive, the ball waits at the start of the beat.
+    private func carryPoint(_ beat: HighlightBeat, index: Int, progress: Double) -> PitchPoint {
+        let span = beatSpan(index)
+        if progress <= span.start { return beat.ballStart }
+        if progress >= span.end { return beat.ballEnd }
+        let length = span.end - span.start
+        let portion = length <= 0 ? 1 : (progress - span.start) / length
+        return lerp(beat.ballStart, beat.ballEnd, portion)
+    }
+
+    /// Where a pass or shot is struck from. A dribble releases from the slower player, not from the end of the scripted run.
+    private func releasePoint(before index: Int, ballProgress: Double, playerProgress: Double) -> PitchPoint {
+        guard index > 0 else { return beats[0].ballStart }
+        let previous = beats[index - 1]
+        switch previous.kind {
+        case .carry:
+            let ratio = ballProgress > 0 ? playerProgress / ballProgress : 1
+            let span = beatSpan(index - 1)
+            return carryPoint(previous, index: index - 1, progress: span.end * ratio)
+        case .pass, .shot:
+            return previous.ballEnd
+        }
+    }
+
+    private func beatSpan(_ index: Int) -> (start: Double, end: Double) {
+        let total = beats.reduce(0) { $0 + $1.weight }
+        guard total > 0 else { return (0, 1) }
+        let prefix = beats.prefix(index).reduce(0) { $0 + $1.weight }
+        let start = prefix / total
+        let end = index == beats.count - 1 ? 1 : (prefix + beats[index].weight) / total
+        return (start, end)
     }
 
     private func interpolated(_ beat: HighlightBeat, portion: Double) -> HighlightPose {
@@ -407,10 +532,11 @@ private struct ScriptBuilder {
             let offset = 0.012 + unit() * 0.02
             return LocalPoint(x: 0.5 + side * offset, y: 0)
         case .wide:
-            let offset = 0.12 + unit() * 0.08
+            let offset = PitchGeometry.displayGoalHalfWidth + 0.07 + unit() * 0.06
             return LocalPoint(x: 0.5 + side * offset, y: 0.02)
         case .over:
-            return LocalPoint(x: 0.5 + side * unit() * 0.03, y: 0.028)
+            let offset = PitchGeometry.displayGoalHalfWidth + 0.03 + unit() * 0.02
+            return LocalPoint(x: 0.5 + side * offset, y: 0.012)
         case .keeper:
             return clampKeeper(LocalPoint(x: 0.5 + side * (0.03 + unit() * 0.05), y: 0.045 + unit() * 0.04))
         }
@@ -464,6 +590,7 @@ private struct ScriptBuilder {
             HighlightBeat(
                 kind: kind,
                 weight: weight,
+                ballOwner: owner,
                 ballStart: absolute(ballStart),
                 ballEnd: absolute(ballEnd),
                 moves: moves

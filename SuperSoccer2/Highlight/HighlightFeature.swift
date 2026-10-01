@@ -7,6 +7,10 @@ struct HighlightFeature {
     static let beatDuration: Duration = .milliseconds(800)
     /// How long the resolved shot stays up so the sentence can be read.
     static let lineDuration: Duration = .milliseconds(2400)
+    /// A goal stays up through the spring, the scorer's card, and the fade.
+    static var goalShownDuration: Duration {
+        .milliseconds(GoalCelebrationTiming.shownMilliseconds)
+    }
 
     @ObservableState
     struct State: Equatable {
@@ -37,7 +41,7 @@ struct HighlightFeature {
         var matchSeed: UInt64
         var script: HighlightScript?
         var attackingEnd: PitchEnd
-        /// Increments when the attacked goal changes, so the view can flip.
+        /// Increments when the attacked goal changes. The pitch swaps ends in place.
         var cameraFlip: Int
         /// Set once the half-time pause has been passed. The second half does not play the first again.
         var halfTimePassed: Bool
@@ -306,7 +310,7 @@ struct HighlightFeature {
                     state.revealCurrent()
                     return .none
                 }
-                return scheduleBeat(for: state.phase)
+                return scheduleBeat(for: state.phase, state: state)
 
             case .view(.advance):
                 guard state.phase != .fullTime, state.phase != .halfTime else { return .none }
@@ -317,7 +321,7 @@ struct HighlightFeature {
                 switch state.phase {
                 case .incoming:
                     state.revealCurrent()
-                    return scheduleBeat(for: state.phase)
+                    return scheduleBeat(for: state.phase, state: state)
                 case .shown:
                     let move = state.moveOn(revealing: false)
                     return effect(for: move, state: state)
@@ -363,14 +367,14 @@ struct HighlightFeature {
             )
         case .shot:
             guard !state.reduceMotion, state.phase == .incoming else { return .none }
-            return scheduleBeat(for: .incoming)
+            return scheduleBeat(for: .incoming, state: state)
         case .fullTime, .waiting:
             return .cancel(id: CancelID.beat)
         }
     }
 
-    private func scheduleBeat(for phase: State.Phase) -> Effect<Action> {
-        let duration = phase == .shown ? Self.lineDuration : Self.beatDuration
+    private func scheduleBeat(for phase: State.Phase, state: State) -> Effect<Action> {
+        let duration = phase == .shown ? shownDuration(state) : Self.beatDuration
         return .run { send in
             do {
                 try await clock.sleep(for: duration)
@@ -380,5 +384,12 @@ struct HighlightFeature {
             }
         }
         .cancellable(id: CancelID.beat, cancelInFlight: true)
+    }
+
+    private func shownDuration(_ state: State) -> Duration {
+        if state.result == .goal, !state.reduceMotion {
+            return Self.goalShownDuration
+        }
+        return Self.lineDuration
     }
 }

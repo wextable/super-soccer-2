@@ -5,16 +5,12 @@ struct HighlightView: View {
     @Bindable var store: StoreOf<HighlightFeature>
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var squashed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.space.md) {
             scoreboard
-            ZStack(alignment: .bottom) {
-                pitch
-                ticker
-                    .padding(theme.space.sm)
-            }
+            pitch
+            ticker
             if store.reduceMotion && (store.phase == .incoming || store.phase == .shown) {
                 Button {
                     store.send(.view(.advance))
@@ -45,15 +41,6 @@ struct HighlightView: View {
         .onAppear {
             store.send(.view(.onAppear(reduceMotion: reduceMotion)))
         }
-        .animation(ballAnimation, value: store.ballProgress)
-        .onChange(of: store.cameraFlip) { _, _ in
-            guard !reduceMotion else { return }
-            squashed = true
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(180))
-                squashed = false
-            }
-        }
     }
 
     private var pitch: some View {
@@ -61,24 +48,22 @@ struct HighlightView: View {
             script: store.script,
             progress: store.ballProgress,
             attackingEnd: store.attackingEnd,
-            attackingShirt: attackingKit.primary.color,
-            attackingShorts: attackingKit.secondary.color,
-            defendingShirt: defendingKit.primary.color,
-            defendingShorts: defendingKit.secondary.color,
-            minute: store.minuteText
+            attacking: attackingKit.primary,
+            defending: defendingKit.primary,
+            minute: store.minuteText,
+            animated: store.sentenceVisible && !reduceMotion && store.phase == .shown
         )
-        .scaleEffect(y: squashed ? 0.08 : 1, anchor: .center)
-        .rotation3DEffect(
-            .degrees(squashed ? 75 : 0),
-            axis: (x: 1, y: 0, z: 0),
-            perspective: 0.5
-        )
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: squashed)
-    }
-
-    private var ballAnimation: Animation? {
-        guard store.sentenceVisible, !reduceMotion else { return nil }
-        return .easeInOut(duration: 1.7)
+        .overlay {
+            if let scorer = celebratingScorer {
+                GoalCelebration(
+                    name: scorer.fullName,
+                    face: scorer.face,
+                    position: scorer.position,
+                    clubID: store.attackingIsHome ? store.homeID : store.awayID,
+                    animated: !reduceMotion
+                )
+            }
+        }
     }
 
     private var scoreboard: some View {
@@ -134,6 +119,14 @@ struct HighlightView: View {
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
             .accessibilityLabel(store.commentary)
             .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
+    }
+
+    /// The scorer, once the goal is on the board. The card sits on the pitch, not the ticker.
+    private var celebratingScorer: Player? {
+        guard store.phase == .shown, store.result == .goal, store.shots.indices.contains(store.index) else {
+            return nil
+        }
+        return store.shots[store.index].shooter
     }
 
     private var attackingKit: Kit {
