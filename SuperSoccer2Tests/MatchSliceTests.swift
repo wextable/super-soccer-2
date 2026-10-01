@@ -1,6 +1,8 @@
+import AVFoundation
 import ComposableArchitecture
 import CryptoKit
 import Foundation
+import os
 import Testing
 @testable import SuperSoccer2
 
@@ -311,6 +313,116 @@ struct HighlightFeatureTests {
         #expect(store.state.homeScore == store.state.finalHomeScore)
         #expect(store.state.awayScore == store.state.finalAwayScore)
         #expect(store.state.index == 2)
+    }
+
+    @Test func theCrowdClipsAreInTheApp() throws {
+        let bundle = try #require(Bundle(identifier: "dev.personal.SuperSoccer2"))
+        let ambient = try AVAudioPlayer(contentsOf: try #require(bundle.url(forResource: "crowd_ambient", withExtension: "caf")))
+        let excited = try AVAudioPlayer(contentsOf: try #require(bundle.url(forResource: "crowd_excited", withExtension: "caf")))
+        let sad = try AVAudioPlayer(contentsOf: try #require(bundle.url(forResource: "crowd_sad", withExtension: "caf")))
+        #expect(ambient.duration > 60)
+        #expect(excited.duration > 1)
+        #expect(excited.duration < 15)
+        #expect(sad.duration > 1)
+        #expect(sad.duration < 15)
+    }
+
+    @Test func theCrowdWaitsForTheBallThenRoars() async {
+        let events = OSAllocatedUnfairLock(initialState: [String]())
+        let clock = TestClock()
+        let store = TestStore(initialState: HighlightFeature.State(match: sampleMatch(), home: sampleHome(), away: sampleAway())) {
+            HighlightFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.crowdSound.prepare = {
+                events.withLock { $0.append("prepare") }
+            }
+            $0.crowdSound.play = { moment in
+                events.withLock { $0.append(moment.rawValue) }
+            }
+            $0.crowdSound.stop = {
+                events.withLock { $0.append("stop") }
+            }
+        }
+
+        await store.send(.view(.onAppear(reduceMotion: false))) {
+            $0.hasAppeared = true
+        }
+        #expect(events.withLock { $0 } == ["prepare", "ambient"])
+
+        await clock.advance(by: HighlightFeature.beatDuration)
+        await store.receive(\.view.advance) {
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+            $0.homeScore = 1
+        }
+        #expect(events.withLock { $0 } == ["prepare", "ambient"])
+
+        await clock.advance(by: .milliseconds(GoalCelebrationTiming.ballMilliseconds - 1))
+        #expect(events.withLock { $0 } == ["prepare", "ambient"])
+        await clock.advance(by: .milliseconds(1))
+        #expect(events.withLock { $0 } == ["prepare", "ambient", "goal"])
+
+        await store.send(.view(.backButtonTapped))
+        await store.receive(\.delegate.dismissed)
+        #expect(events.withLock { $0 } == ["prepare", "ambient", "goal", "stop"])
+    }
+
+    @Test func theCrowdGroansForAMissAndASave() async {
+        let home = sampleHome()
+        let away = sampleAway()
+        let miss = makeShot(id: 0, minute: 8, result: .miss, shooter: "Ada Striker", isHome: false)
+        let save = makeShot(id: 1, minute: 22, result: .save, shooter: "Bo Scaramucci", keeper: "Hank Keeper", isHome: true)
+        let match = MatchResult(
+            homeScore: 0,
+            awayScore: 0,
+            shots: [miss, save],
+            highlight: miss,
+            commentary: "",
+            seed: 5
+        )
+        let events = OSAllocatedUnfairLock(initialState: [String]())
+        let store = TestStore(initialState: HighlightFeature.State(match: match, home: home, away: away)) {
+            HighlightFeature()
+        } withDependencies: {
+            $0.crowdSound.prepare = {
+                events.withLock { $0.append("prepare") }
+            }
+            $0.crowdSound.play = { moment in
+                events.withLock { $0.append(moment.rawValue) }
+            }
+            $0.crowdSound.stop = {
+                events.withLock { $0.append("stop") }
+            }
+        }
+        let saveScript = HighlightScript.make(shot: save, matchSeed: 5)
+        let saveLine = Commentary.line(shot: save, attackingClub: home.name, defendingClub: away.name)
+
+        await store.send(.view(.onAppear(reduceMotion: true))) {
+            $0.hasAppeared = true
+            $0.reduceMotion = true
+            $0.phase = .shown
+            $0.ballProgress = 1
+            $0.sentenceVisible = true
+        }
+        #expect(events.withLock { $0 } == ["prepare", "ambient", "miss"])
+
+        await store.send(.view(.advance)) {
+            $0.index = 1
+            $0.minute = 22
+            $0.commentary = saveLine
+            $0.attackingIsHome = true
+            $0.result = .save
+            $0.script = saveScript
+            $0.attackingEnd = saveScript.attackingEnd
+            $0.cameraFlip = 1
+        }
+        #expect(events.withLock { $0 } == ["prepare", "ambient", "miss", "save"])
+
+        await store.send(.view(.backButtonTapped))
+        await store.receive(\.delegate.dismissed)
+        #expect(events.withLock { $0 } == ["prepare", "ambient", "miss", "save", "stop"])
     }
 
     @Test func aGoalHoldsThroughTheScorersCard() {

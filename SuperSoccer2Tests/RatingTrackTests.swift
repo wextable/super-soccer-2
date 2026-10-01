@@ -277,6 +277,45 @@ struct SkillChoiceLimitTests {
         await store.finish()
     }
 
+    @Test func theLevelUpSoundIsPreparedBeforeItPlays() async throws {
+        let player = Player(
+            id: "p",
+            firstName: "Ada",
+            lastName: "Ball",
+            position: .forward,
+            condition: 100,
+            ratings: Ratings(speed: 80, shooting: 70, passing: 70, dribbling: 70, defending: 50, goalkeeping: 40)
+        )
+        let events = OSAllocatedUnfairLock(initialState: [String]())
+        let clock = TestClock()
+        let store = skillStore(player: player, clock: clock) {
+            $0.levelUpSound.prepare = {
+                events.withLock { $0.append("prepare") }
+            }
+            $0.levelUpSound.play = {
+                events.withLock { $0.append("play") }
+            }
+        }
+
+        await store.send(.view(.onAppear))
+        #expect(events.withLock { $0 } == ["prepare"])
+        await store.send(.view(.statTapped(.shooting, reduceMotion: false))) {
+            $0.selectedStat = .shooting
+            $0.phase = .selected
+        }
+        #expect(events.withLock { $0 } == ["prepare"])
+        await clock.advance(by: SkillChoiceFeature.selectBeat)
+        await store.receive(\.internal.grow) {
+            $0.phase = .growing
+        }
+        #expect(events.withLock { $0 } == ["prepare", "play"])
+        await clock.advance(by: SkillChoiceFeature.growBeat)
+        await store.receive(\.internal.grown) {
+            $0.phase = .grown
+        }
+        await store.finish()
+    }
+
     @Test func reducedMotionStillWaitsToBeDismissed() async throws {
         let player = Player(
             id: "p",
