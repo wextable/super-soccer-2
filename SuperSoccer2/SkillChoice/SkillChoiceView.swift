@@ -28,6 +28,7 @@ struct SkillChoiceView: View {
         }
         .themeScreen()
         .interactiveDismissDisabled()
+        .onAppear { store.send(.view(.onAppear)) }
         .sensoryFeedback(.selection, trigger: store.selectedStat)
     }
 

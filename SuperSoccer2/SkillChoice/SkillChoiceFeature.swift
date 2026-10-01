@@ -67,6 +67,7 @@ struct SkillChoiceFeature {
 
         @CasePathable
         enum View {
+            case onAppear
             case statTapped(PlayerStat, reduceMotion: Bool)
             case continueTapped
         }
@@ -91,6 +92,9 @@ struct SkillChoiceFeature {
     var body: some ReducerOf<Self> {
         Reduce<State, Action> { state, action in
             switch action {
+            case .view(.onAppear):
+                return prepareSound()
+
             case let .view(.statTapped(stat, reduceMotion)):
                 guard state.phase == .choosing,
                       let choice = state.choices.first(where: { $0.stat == stat })
@@ -141,6 +145,12 @@ struct SkillChoiceFeature {
             }
         }
         .cancellable(id: CancelID.reveal, cancelInFlight: true)
+    }
+
+    private func prepareSound() -> Effect<Action> {
+        .run { [levelUpSound] _ in
+            await levelUpSound.prepare()
+        }
     }
 
     private func playSound() -> Effect<Action> {
