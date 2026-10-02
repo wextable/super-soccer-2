@@ -39,6 +39,8 @@ struct HighlightFeature {
         var reduceMotion: Bool
         var hasAppeared: Bool
         var matchSeed: UInt64
+        /// The match seed picks one commentator. The name sits above the caption.
+        var commentatorName: String
         var script: HighlightScript?
         var attackingEnd: PitchEnd
         /// Increments when the attacked goal changes. The pitch swaps ends in place.
@@ -107,6 +109,7 @@ struct HighlightFeature {
             reduceMotion = false
             hasAppeared = false
             matchSeed = match.seed
+            commentatorName = Commentator.forMatch(seed: match.seed).name
             script = nil
             attackingEnd = .north
             cameraFlip = 0
@@ -248,11 +251,7 @@ struct HighlightFeature {
         }
 
         private func line(for shot: Shot) -> String {
-            Commentary.line(
-                shot: shot,
-                attackingClub: shot.isHome ? homeName : awayName,
-                defendingClub: shot.isHome ? awayName : homeName
-            )
+            MatchCommentary.make(shot: shot, matchSeed: matchSeed).caption
         }
 
         private func goals(endingAt end: Int) -> (home: Int, away: Int) {

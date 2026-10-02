@@ -110,15 +110,21 @@ struct HighlightView: View {
     }
 
     private var ticker: some View {
-        Text(store.sentenceVisible ? store.commentary : "…")
-            .font(theme.type.ticker)
-            .foregroundStyle(theme.colors.ticker.color)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(theme.space.md)
-            .background(theme.colors.tickerBackground.color)
-            .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
-            .accessibilityLabel(store.commentary)
-            .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
+        VStack(alignment: .leading, spacing: theme.space.xs) {
+            Text(store.commentatorName)
+                .font(theme.type.eyebrow)
+                .foregroundStyle(theme.colors.secondaryText.color)
+                .accessibilityAddTraits(.isHeader)
+            Text(store.sentenceVisible ? store.commentary : "…")
+                .font(theme.type.ticker)
+                .foregroundStyle(theme.colors.ticker.color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(theme.space.md)
+                .background(theme.colors.tickerBackground.color)
+                .clipShape(RoundedRectangle(cornerRadius: theme.metrics.tickerRadius, style: .continuous))
+                .accessibilityLabel(store.commentary)
+                .accessibilityHidden(!store.sentenceVisible || store.phase == .fullTime)
+        }
     }
 
     /// The scorer, once the goal is on the board. The card sits on the pitch, not the ticker.

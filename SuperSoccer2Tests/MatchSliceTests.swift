@@ -227,6 +227,9 @@ struct HighlightFeatureTests {
         let shots = store.state.shots
         let penalty = HighlightScript.make(shot: shots[1], matchSeed: 7)
         let later = HighlightScript.make(shot: shots[2], matchSeed: 7)
+        let openerLine = spoken(shots[0], seed: 7)
+        let penaltyLine = spoken(shots[1], seed: 7)
+        let laterLine = spoken(shots[2], seed: 7)
 
         #expect(store.state.shots.map(\.minute) == [6, 18, 44])
         #expect(store.state.phase == .incoming)
@@ -234,7 +237,8 @@ struct HighlightFeatureTests {
         #expect(store.state.homeScore == 0)
         #expect(store.state.awayScore == 0)
         #expect(store.state.sentenceVisible == false)
-        #expect(store.state.commentary == "Ada Striker of Norwich City shoots. Hank Keeper saves for Manchester City.")
+        #expect(store.state.commentatorName == "Randy Cobb")
+        #expect(store.state.commentary == openerLine)
 
         await store.send(.view(.onAppear(reduceMotion: false))) {
             $0.hasAppeared = true
@@ -252,7 +256,7 @@ struct HighlightFeatureTests {
             $0.index = 1
             $0.phase = .incoming
             $0.minute = 18
-            $0.commentary = "Penalty. Bo Scaramucci of Manchester City scores."
+            $0.commentary = penaltyLine
             $0.attackingIsHome = true
             $0.result = .goal
             $0.ballProgress = 0
@@ -275,7 +279,7 @@ struct HighlightFeatureTests {
             $0.index = 2
             $0.phase = .incoming
             $0.minute = 44
-            $0.commentary = "Queef Pistacio of Norwich City scores from Chode Magnusson."
+            $0.commentary = laterLine
             $0.attackingIsHome = false
             $0.showsPasser = true
             $0.ballProgress = 0
@@ -397,7 +401,7 @@ struct HighlightFeatureTests {
             }
         }
         let saveScript = HighlightScript.make(shot: save, matchSeed: 5)
-        let saveLine = Commentary.line(shot: save, attackingClub: home.name, defendingClub: away.name)
+        let saveLine = spoken(save, seed: 5)
 
         await store.send(.view(.onAppear(reduceMotion: true))) {
             $0.hasAppeared = true
@@ -448,7 +452,7 @@ struct HighlightFeatureTests {
             $0.sentenceVisible = true
             $0.homeScore = 1
         }
-        #expect(store.state.commentary == "Bo Scaramucci of Manchester City scores from Chode Magnusson.")
+        #expect(store.state.commentary == spoken(store.state.shots[0], seed: 1))
     }
 
     @Test func reduceMotionStepsToFullTimeWithoutAClock() async {
@@ -467,11 +471,13 @@ struct HighlightFeatureTests {
         let shots = store.state.shots
         let penalty = HighlightScript.make(shot: shots[1], matchSeed: 7)
         let later = HighlightScript.make(shot: shots[2], matchSeed: 7)
+        let penaltyLine = spoken(shots[1], seed: 7)
+        let laterLine = spoken(shots[2], seed: 7)
 
         await store.send(.view(.advance)) {
             $0.index = 1
             $0.minute = 18
-            $0.commentary = "Penalty. Bo Scaramucci of Manchester City scores."
+            $0.commentary = penaltyLine
             $0.attackingIsHome = true
             $0.result = .goal
             $0.homeScore = 1
@@ -483,7 +489,7 @@ struct HighlightFeatureTests {
         await store.send(.view(.advance)) {
             $0.index = 2
             $0.minute = 44
-            $0.commentary = "Queef Pistacio of Norwich City scores from Chode Magnusson."
+            $0.commentary = laterLine
             $0.attackingIsHome = false
             $0.showsPasser = true
             $0.awayScore = 1
@@ -598,7 +604,7 @@ struct HighlightFeatureTests {
             $0.continuousClock = clock
         }
         let secondScript = HighlightScript.make(shot: second, matchSeed: 3)
-        let secondLine = Commentary.line(shot: second, attackingClub: home.name, defendingClub: away.name)
+        let secondLine = spoken(second, seed: 3)
 
         await store.send(.view(.onAppear(reduceMotion: false))) {
             $0.hasAppeared = true
@@ -669,6 +675,7 @@ struct HighlightFeatureTests {
             HighlightFeature()
         }
         let script = HighlightScript.make(shot: late, matchSeed: 8)
+        let lateLine = spoken(late, seed: 8)
         #expect(store.state.phase == .halfTime)
         #expect(store.state.index == 0)
         #expect(store.state.script == nil)
@@ -682,7 +689,7 @@ struct HighlightFeatureTests {
             $0.halfTimePassed = true
             $0.phase = .shown
             $0.minute = 60
-            $0.commentary = "Bo Scaramucci of Manchester City scores."
+            $0.commentary = lateLine
             $0.result = .goal
             $0.homeScore = 1
             $0.script = script
@@ -898,8 +905,6 @@ struct AppFeatureTests {
         let played = try #require(store.state.game)
         let userMatch = try #require(played.pending?.userMatch)
         let shot = try #require(userMatch.shots.first)
-        let home = try #require(played.pending?.home)
-        let away = try #require(played.pending?.away)
         #expect(played.pending?.scorelines.count == 10)
         #expect(played.scorelines.isEmpty)
         #expect(played.standings.allSatisfy { $0.played == 0 })
@@ -911,13 +916,8 @@ struct AppFeatureTests {
         #expect(played.highlight?.finalAwayScore == userMatch.awayScore)
         #expect(played.highlight?.shots.map(\.id) == userMatch.shots.map(\.id))
         #expect(played.highlight?.minute == shot.minute)
-        #expect(
-            played.highlight?.commentary == Commentary.line(
-                shot: shot,
-                attackingClub: shot.isHome ? home.name : away.name,
-                defendingClub: shot.isHome ? away.name : home.name
-            )
-        )
+        #expect(played.highlight?.commentary == spoken(shot, seed: userMatch.seed))
+        #expect(played.highlight?.commentatorName == Commentator.forMatch(seed: userMatch.seed).name)
 
         await store.send(.game(.highlight(.presented(.view(.skipButtonTapped)))))
         await store.send(.game(.highlight(.presented(.view(.statsButtonTapped)))))
@@ -1063,6 +1063,10 @@ regular
 Dick Ruben of Manchester City scores from Elijah Gary.
 names Darrius Christopher | Chestnutt Gus
 """
+
+private func spoken(_ shot: Shot, seed: UInt64) -> String {
+    MatchCommentary.make(shot: shot, matchSeed: seed).caption
+}
 
 private func makePlayer(
     id: String = "p",
