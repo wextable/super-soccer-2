@@ -91,12 +91,11 @@ struct MatchCommentaryTests {
             #expect(line.caption.components(separatedBy: line.aside).count == 2)
             switch line.commentator {
             case .pemberton:
-                #expect(line.aside.contains("mystification") || line.aside.contains("bewildered"))
+                #expect(line.aside.contains("!") == false)
                 #expect(line.caption.hasSuffix(line.result))
                 ornate += 1
             case .mulch:
-                #expect(line.aside.contains("fridge") || line.aside.contains("thought") || line.aside.contains("swan"))
-                #expect(line.caption.hasPrefix(line.lead.isEmpty ? line.result : line.lead) || line.caption.contains(line.result))
+                #expect(line.aside.contains("!") == false)
                 let resultAt = line.caption.range(of: line.result)
                 let asideAt = line.caption.range(of: line.aside)
                 #expect((resultAt?.lowerBound ?? line.caption.endIndex) < (asideAt?.lowerBound ?? line.caption.startIndex))
@@ -142,28 +141,151 @@ struct MatchCommentaryTests {
             #expect(line.result.contains("Keeper"))
         }
     }
+
+    @Test func eachPersonaHasALargeBank() {
+        #expect(CommentaryPhrases.lineCount(voice: .pemberton) > 200)
+        #expect(CommentaryPhrases.lineCount(voice: .cobb) > 200)
+        #expect(CommentaryPhrases.lineCount(voice: .mulch) > 200)
+    }
+
+    @Test func penaltiesReadAsPenalties() {
+        var spoken: [Commentator: Set<String>] = [:]
+        for seed in UInt64(0)..<90 {
+            let shot = commentaryShot(id: Int(seed), result: .goal, type: .penalty, passer: false)
+            let script = HighlightScript.make(shot: shot, matchSeed: seed)
+            let line = MatchCommentary.make(shot: shot, matchSeed: seed)
+            #expect(script.template == .penalty)
+            #expect(line.result.contains("penalty") || line.result.contains("spot"))
+            #expect(line.result.contains("Scaramucci"))
+            #expect(line.result.contains("Magnusson") == false)
+            #expect(line.aside.isEmpty)
+            spoken[line.commentator, default: []].insert(line.result)
+        }
+        for voice in Commentator.allCases {
+            #expect(spoken[voice, default: []].count > 2)
+        }
+    }
+
+    @Test func oneSituationHasManyLines() {
+        var spoken: [Commentator: Set<String>] = [:]
+        let shot = commentaryShot(id: 3, result: .goal, passer: true)
+        for seed in UInt64(0)..<480 {
+            let script = HighlightScript.make(shot: shot, matchSeed: seed)
+            guard script.template == .cutback else { continue }
+            let line = MatchCommentary.make(shot: shot, matchSeed: seed)
+            #expect(line.result.contains("cutback") || line.result.contains("byline"))
+            spoken[line.commentator, default: []].insert(line.result)
+        }
+        for voice in Commentator.allCases {
+            #expect(spoken[voice, default: []].count > 2)
+        }
+    }
+
+    @Test func aCutbackIsNotACounter() {
+        var cutbackLeads: [Commentator: Set<String>] = [:]
+        var counterLeads: [Commentator: Set<String>] = [:]
+        let shot = commentaryShot(id: 1, result: .goal, passer: true)
+        for seed in UInt64(0)..<600 {
+            let script = HighlightScript.make(shot: shot, matchSeed: seed)
+            guard script.template == .cutback || script.template == .counter else { continue }
+            let line = MatchCommentary.make(shot: shot, matchSeed: seed)
+            #expect(script.beats.count >= 3)
+            if script.template == .cutback {
+                #expect(line.result.contains("cutback") || line.result.contains("byline"))
+                #expect(line.result.contains("break") == false)
+                #expect(line.result.contains("counter") == false)
+                #expect(line.lead.contains("break") == false)
+                #expect(line.lead.contains("counter") == false)
+                if words(line.lead) >= 3 {
+                    cutbackLeads[line.commentator, default: []].insert(line.lead)
+                }
+            } else {
+                #expect(line.result.contains("break") || line.result.contains("counter"))
+                #expect(line.result.contains("cutback") == false)
+                #expect(line.result.contains("byline") == false)
+                #expect(line.lead.contains("cutback") == false)
+                #expect(line.lead.contains("byline") == false)
+                if words(line.lead) >= 3 {
+                    counterLeads[line.commentator, default: []].insert(line.lead)
+                }
+            }
+        }
+        for voice in Commentator.allCases {
+            #expect(cutbackLeads[voice, default: []].isEmpty == false)
+            #expect(counterLeads[voice, default: []].isEmpty == false)
+            #expect(cutbackLeads[voice, default: []].isDisjoint(with: counterLeads[voice, default: []]))
+        }
+    }
+
+    @Test func aMissOverIsNotAMissWide() {
+        for seed in UInt64(0)..<48 {
+            let shot = commentaryShot(
+                id: Int(seed % 5),
+                result: .miss,
+                type: seed.isMultiple(of: 2) ? .penalty : .regular,
+                passer: !seed.isMultiple(of: 2)
+            )
+            let script = HighlightScript.make(shot: shot, matchSeed: seed)
+            let line = MatchCommentary.make(shot: shot, matchSeed: seed)
+            if script.finish == .over {
+                #expect(mentions(line.result, overWords))
+                #expect(mentions(line.result, wideOnlyWords) == false)
+            } else {
+                #expect(script.finish == .wide)
+                #expect(mentions(line.result, wideWords))
+                #expect(mentions(line.result, overOnlyWords) == false)
+            }
+        }
+    }
+
+    @Test func aPassCanNameThePasser() {
+        var named = false
+        for seed in UInt64(0)..<80 {
+            let passed = commentaryShot(id: 2, result: .goal, passer: true)
+            let alone = commentaryShot(id: 2, minute: 30, result: .goal, passer: false)
+            let withPass = MatchCommentary.make(shot: passed, matchSeed: seed)
+            let solo = MatchCommentary.make(shot: alone, matchSeed: seed)
+            if withPass.caption.contains("Magnusson") {
+                named = true
+            }
+            #expect(solo.caption.contains("Magnusson") == false)
+        }
+        #expect(named)
+    }
+}
+
+private let wideWords = ["wide", "post", "shank", "drag", "pull", "yank", "blow", "miss"]
+private let wideOnlyWords = ["wide", "post", "shank", "drag", "pull", "yank", "blow"]
+private let overWords = ["over", "bar", "skies", "float", "spoon", "loft", "hoist"]
+private let overOnlyWords = ["over", "bar", "skies", "float", "spoon", "loft", "hoist"]
+
+private func mentions(_ text: String, _ words: [String]) -> Bool {
+    words.contains { text.contains($0) }
 }
 
 private func expectVoice(_ line: MatchCommentary, shot: Shot) {
     #expect(sentenceCount(line.result) == 1)
     let shooter = shot.shooter.lastName
     let keeper = shot.keeper.lastName
+    if shot.type == .penalty {
+        #expect(line.result.contains("penalty") || line.result.contains("spot"))
+    }
     switch line.commentator {
     case .pemberton:
         #expect(line.caption.contains("!") == false)
         #expect(line.caption.contains("skies") == false)
+        #expect(line.caption.contains("shanks") == false)
         #expect(line.caption.contains("fridge") == false)
         #expect(line.caption.contains("buries") == false)
         if shot.result == .goal {
-            #expect(line.result.contains("rather beautifully"))
             #expect(line.result.contains(shooter))
         }
         if shot.result == .save {
-            #expect(line.result.contains("which will do"))
             #expect(line.result.contains(keeper))
         }
         if shot.result == .miss {
-            #expect(line.result.contains("puts it") || line.result.contains("misses from the spot"))
+            #expect(line.result.contains(shooter))
+            #expect(mentions(line.result, wideWords + overWords))
         }
     case .cobb:
         #expect(line.aside.isEmpty)
@@ -173,28 +295,29 @@ private func expectVoice(_ line: MatchCommentary, shot: Shot) {
         #expect(words(line.caption) <= 12)
         if shot.result == .goal {
             #expect(line.result.contains(shooter))
-            #expect(line.result.contains("buries"))
             #expect(line.result.contains("!"))
         }
         if shot.result == .save {
-            #expect(line.result.contains("stops"))
             #expect(line.result.contains(keeper))
         }
         if shot.result == .miss {
-            #expect(line.result.contains("skies") || line.result.contains("shanks"))
+            #expect(line.result.contains(shooter))
             #expect(line.caption.contains("!"))
+            #expect(mentions(line.result, wideWords + overWords))
         }
     case .mulch:
+        #expect(line.caption.contains("!") == false)
         #expect(line.caption.contains("rather beautifully") == false)
         #expect(line.caption.contains("buries") == false)
         #expect(line.caption.contains("skies") == false)
         switch shot.result {
-        case .goal:
-            #expect(line.result == (shot.type == .penalty ? "\(shooter) scores the penalty." : "\(shooter) scores."))
+        case .goal, .miss:
+            #expect(line.result.contains(shooter))
         case .save:
-            #expect(line.result == (shot.type == .penalty ? "\(keeper) saves the penalty." : "\(keeper) saves."))
-        case .miss:
-            #expect(line.result == (shot.type == .penalty ? "\(shooter) misses the penalty." : "\(shooter) misses."))
+            #expect(line.result.contains(keeper))
+        }
+        if shot.result == .miss {
+            #expect(mentions(line.result, wideWords + overWords))
         }
         if !line.aside.isEmpty {
             let resultAt = line.caption.range(of: line.result)

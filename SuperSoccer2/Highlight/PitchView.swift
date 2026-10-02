@@ -95,19 +95,29 @@ struct PitchView: View {
                 }
             }
             .overlay(alignment: .bottomLeading) {
-                ZStack(alignment: .bottomLeading) {
-                    Text(minute)
-                        .offset(x: 1, y: 1)
-                        .foregroundStyle(.black)
-                    Text(minute)
-                        .foregroundStyle(theme.colors.pitchLine.color)
+                pitchStamp(minute)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if script?.template == .penalty {
+                    pitchStamp("Penalty")
                 }
-                .font(theme.type.minute)
-                .padding(theme.space.sm)
-                .accessibilityHidden(true)
             }
             .clipShape(RoundedRectangle(cornerRadius: theme.metrics.pitchRadius, style: .continuous))
             .accessibilityHidden(true)
+    }
+
+    /// The minute, and the penalty label, share the pitch ink. The field underneath stays as it was.
+    private func pitchStamp(_ title: String) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Text(title)
+                .offset(x: 1, y: 1)
+                .foregroundStyle(.black)
+            Text(title)
+                .foregroundStyle(theme.colors.pitchLine.color)
+        }
+        .font(theme.type.minute)
+        .padding(theme.space.sm)
+        .accessibilityHidden(true)
     }
 
     /// North is the bottom of the screen. South is the top.
