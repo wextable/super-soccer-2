@@ -56,16 +56,17 @@ struct MatchCommentary: Equatable, Sendable {
         )
         let aside = asideLine(
             commentator: commentator,
-            shooter: names.shooter,
+            names: names,
+            template: script.template,
             long: long,
             using: &rng
         )
         let result = resultLine(
             commentator: commentator,
-            shot: shot,
+            template: script.template,
             finish: script.finish,
             names: names,
-            shooterAlreadyNamed: lead.namesShooter
+            using: &rng
         )
         return MatchCommentary(
             commentator: commentator,
@@ -78,7 +79,6 @@ struct MatchCommentary: Equatable, Sendable {
 
 private struct SpokenLead {
     var text: String
-    var namesShooter: Bool
 }
 
 /// Surnames, unless two players in the chance share one.
@@ -116,13 +116,13 @@ extension MatchCommentary {
     ) -> SpokenLead {
         let roll = Int(rng.next() % UInt64(long ? 5 : 2))
         if long, roll == 4 {
-            return SpokenLead(text: phrase(commentator, names: names, template: template), namesShooter: true)
+            return SpokenLead(text: phrase(commentator, names: names, template: template, using: &rng))
         }
         let saysSurname = long ? roll == 2 || roll == 3 : roll == 1
         if saysSurname {
-            return SpokenLead(text: surname(commentator, names.shooter), namesShooter: true)
+            return SpokenLead(text: surname(commentator, names.shooter))
         }
-        return SpokenLead(text: "", namesShooter: false)
+        return SpokenLead(text: "")
     }
 
     private static func surname(_ commentator: Commentator, _ shooter: String) -> String {
@@ -137,124 +137,49 @@ extension MatchCommentary {
     private static func phrase(
         _ commentator: Commentator,
         names: SpokenNames,
-        template: HighlightTemplate
+        template: HighlightTemplate,
+        using rng: inout SeededGenerator
     ) -> String {
-        let shooter = names.shooter
-        let pass = names.passer.map { "\($0) to \(shooter)" }
-        switch commentator {
-        case .pemberton, .mulch:
-            switch template {
-            case .wing:
-                return "\(shooter), in oceans of space."
-            case .counter:
-                return "\(shooter), away on the break."
-            case .cutback:
-                return "\(shooter), from the byline."
-            case .oneTwo, .throughTheMiddle:
-                if let pass {
-                    return "\(pass)."
-                }
-                return "\(shooter), through the middle."
-            case .penalty:
-                return surname(commentator, shooter)
-            }
-        case .cobb:
-            switch template {
-            case .wing:
-                return "\(shooter)! He's got room!"
-            case .counter:
-                return "\(shooter)! He's gone!"
-            case .cutback:
-                return "\(shooter)! On the line!"
-            case .oneTwo, .throughTheMiddle:
-                if let pass {
-                    return "\(pass)!"
-                }
-                return "\(shooter)! He's got room!"
-            case .penalty:
-                return surname(commentator, shooter)
-            }
+        guard template != .penalty else { return surname(commentator, names.shooter) }
+        var pool = CommentaryPhrases.leads(voice: commentator, template: template)
+        if names.passer == nil {
+            pool = pool.filter { !$0.contains("{P}") }
         }
+        guard !pool.isEmpty else { return surname(commentator, names.shooter) }
+        let line = pool[Int(rng.next() % UInt64(pool.count))]
+        return CommentaryPhrases.fill(line, shooter: names.shooter, passer: names.passer, keeper: names.keeper)
     }
 
     private static func asideLine(
         commentator: Commentator,
-        shooter: String,
+        names: SpokenNames,
+        template: HighlightTemplate,
         long: Bool,
         using rng: inout SeededGenerator
     ) -> String {
-        guard long, commentator != .cobb, rng.next() % 4 == 0 else { return "" }
-        let pick = Int(rng.next() % 3)
-        switch commentator {
-        case .pemberton:
-            if pick == 0 {
-                return "A look of mystification on the angular face of \(shooter)."
-            }
-            return "A faintly bewildered hush follows \(shooter)."
-        case .mulch:
-            switch pick {
-            case 0:
-                return "Like a fridge winning a race against a lawnmower."
-            case 1:
-                return "I had a thought and then it left."
-            default:
-                return "Which is a swan, or a parking meter."
-            }
-        case .cobb:
-            return ""
-        }
+        guard long, commentator != .cobb, template != .penalty, rng.next() % 4 == 0 else { return "" }
+        let pool = CommentaryPhrases.asides(voice: commentator, template: template)
+        guard !pool.isEmpty else { return "" }
+        let line = pool[Int(rng.next() % UInt64(pool.count))]
+        return CommentaryPhrases.fill(line, shooter: names.shooter, passer: names.passer, keeper: names.keeper)
     }
 
     private static func resultLine(
         commentator: Commentator,
-        shot: Shot,
+        template: HighlightTemplate,
         finish: ShotFinish,
         names: SpokenNames,
-        shooterAlreadyNamed: Bool
+        using rng: inout SeededGenerator
     ) -> String {
-        let shooter = names.shooter
-        let keeper = names.keeper
-        let penalty = shot.type == .penalty
-        switch commentator {
-        case .pemberton:
-            switch shot.result {
-            case .goal:
-                return penalty
-                    ? "And \(shooter), rather beautifully, is in from the spot."
-                    : "And \(shooter), rather beautifully, is in."
-            case .save:
-                return penalty
-                    ? "\(keeper) saves the penalty, which will do."
-                    : "\(keeper) saves, which will do."
-            case .miss:
-                if penalty { return "\(shooter) misses from the spot." }
-                return finish == .over ? "\(shooter) puts it over." : "\(shooter) puts it wide."
-            }
-        case .cobb:
-            switch shot.result {
-            case .goal:
-                return penalty ? "\(shooter) buries the penalty!" : "\(shooter) buries it!"
-            case .save:
-                return penalty ? "\(keeper) stops the penalty." : "\(keeper) stops it."
-            case .miss:
-                if penalty {
-                    return finish == .over ? "\(shooter) skies the penalty!" : "\(shooter) shanks the penalty!"
-                }
-                if finish == .over {
-                    return shooterAlreadyNamed ? "And he skies it." : "\(shooter) skies it!"
-                }
-                return shooterAlreadyNamed ? "And he shanks it." : "\(shooter) shanks it!"
-            }
-        case .mulch:
-            switch shot.result {
-            case .goal:
-                return penalty ? "\(shooter) scores the penalty." : "\(shooter) scores."
-            case .save:
-                return penalty ? "\(keeper) saves the penalty." : "\(keeper) saves."
-            case .miss:
-                return penalty ? "\(shooter) misses the penalty." : "\(shooter) misses."
-            }
-        }
+        let passed = template != .penalty && names.passer != nil
+        let pool = CommentaryPhrases.results(
+            voice: commentator,
+            template: template,
+            passed: passed,
+            finish: finish
+        )
+        let line = pool[Int(rng.next() % UInt64(pool.count))]
+        return CommentaryPhrases.fill(line, shooter: names.shooter, passer: names.passer, keeper: names.keeper)
     }
 
     private static func commentarySeed(matchSeed: UInt64, shot: Shot) -> UInt64 {
